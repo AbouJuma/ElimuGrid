@@ -253,9 +253,10 @@ class SchoolDataService {
 
         $db = DB::select($query, [$database_name]);
         
-        if (empty($db)) {
-            DB::statement("CREATE DATABASE IF NOT EXISTS `{$database_name}`");
-        }
+        // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
+        // if (empty($db)) {
+        //     DB::statement("CREATE DATABASE IF NOT EXISTS `{$database_name}`");
+        // }
 
         $schoolData->database_name = $database_name;
         $schoolData->save();
