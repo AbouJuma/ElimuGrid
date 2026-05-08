@@ -88,5 +88,6 @@ class Kernel extends HttpKernel {
         'CheckForMaintenanceMode'           => \App\Http\Middleware\CheckForMaintenanceMode::class,
         '2fa' => \App\Http\Middleware\CheckTwoFactorAuthenticated::class,
         'wizardSettings' => \App\Http\Middleware\WizardSettings::class,
+        'feature_check' => \App\Http\Middleware\FeatureCheck::class,
     ];
 }
