@@ -1215,3 +1215,5 @@ Route::get('demo-tokens', static function () {
     }
 });
 
+// Virtual Classroom Routes
+require __DIR__ . '/virtual_classroom.php';

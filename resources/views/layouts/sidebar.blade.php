@@ -354,6 +354,45 @@
             </li>
         @endcanany
 
+        {{-- Virtual Classroom --}}
+        <li class="nav-item">
+            <a class="nav-link" data-toggle="collapse" href="#virtual-classroom-menu" aria-expanded="false"
+               aria-controls="virtual-classroom-menu">
+                <i class="fa fa-video menu-icon"></i>
+                <span class="menu-title">{{ __('Virtual Classroom') }}</span>
+                <i class="menu-arrow"></i>
+            </a>
+            <div class="collapse" id="virtual-classroom-menu">
+                <ul class="nav flex-column sub-menu">
+                    <li class="nav-item">
+                        <a href="{{ route('virtual-classroom.index') }}" class="nav-link">
+                            {{ __('All Sessions') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('virtual-classroom.create') }}" class="nav-link">
+                            {{ __('Create Session') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('virtual-classroom.index', ['status' => 'scheduled']) }}" class="nav-link">
+                            {{ __('Upcoming Sessions') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('virtual-classroom.index', ['status' => 'live']) }}" class="nav-link">
+                            {{ __('Live Classes') }}
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('virtual-classroom.reports') }}" class="nav-link">
+                            {{ __('Reports') }}
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+
         {{-- Slider --}}
         @can('slider-create')
             <li class="nav-item">
