@@ -1039,7 +1039,8 @@ class SchoolController extends Controller {
                 $schoolData = $this->schoolsRepository->update($schoolData->id, ['admin_id' => $user->id, 'database_name' => $database_name]);
                 $schoolService = app(SchoolDataService::class);
                
-                DB::statement("CREATE DATABASE {$database_name}");
+                // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
+                // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
                 $schoolService->createDatabaseMigration($schoolData);
                 $schoolService->preSettingsSetup($schoolData);
                
@@ -1206,7 +1207,8 @@ class SchoolController extends Controller {
             $schoolService = app(SchoolDataService::class);
             // Add Pre School Settings By Default
 
-            DB::statement("CREATE DATABASE {$database_name}");
+            // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
+            // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
 
             $schoolService->createDatabaseMigration($schoolData);
 
@@ -1409,7 +1411,8 @@ class SchoolController extends Controller {
               
 
                 
-                DB::statement("CREATE DATABASE {$database_name}");
+                // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
+                // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
 
                 $schoolService->createDatabaseMigration($schoolData);
 
