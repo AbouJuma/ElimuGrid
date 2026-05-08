@@ -20,6 +20,7 @@ use App\Services\GeneralFunctionService;
 use App\Services\ResponseService;
 use App\Services\SchoolDataService;
 use App\Services\SubscriptionService;
+use App\Services\SharedHostingTenantService;
 use Auth;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -155,7 +156,14 @@ class SchoolController extends Controller {
             
 
             $school_name = str_replace('.','_',$request->school_name);
-            $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name," "));
+            // Use prefix-based database for shared hosting compatibility
+            $database_name = 'school_' . $schoolData->id . '_';
+
+            // Create tenant tables with prefix instead of separate database
+            SharedHostingTenantService::createTenantTables($schoolData->id);
+
+            // Switch to tenant to create admin user
+            SharedHostingTenantService::switchToTenant($schoolData->id);
 
             $admin_data = array(
                 'first_name' => "School",
@@ -165,14 +173,13 @@ class SchoolController extends Controller {
                 'password'   => Hash::make($request->school_support_phone),
                 'school_id'  => $schoolData->id,
                 'image'      => $request->file('school_image'),
-                // 'two_factor_enabled' => 0,
-                // 'two_factor_secret' => null,
-                // 'two_factor_expires_at' => null,
             );
-
 
             //Call store function of User Repository and get the admin data
             $user = $this->userRepository->create($admin_data);
+
+            // Switch back to main database
+            SharedHostingTenantService::switchToMain();
 
 
             $schoolDataArray = [];
@@ -225,8 +232,10 @@ class SchoolController extends Controller {
 
             $schoolService = app(SchoolDataService::class);
             
-            DB::statement("CREATE DATABASE {$database_name}");
+            // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
+            // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
 
+            // Create tenant tables with prefix-based approach
             $schoolService->createDatabaseMigration($schoolData);
 
             // Add Pre School Settings By Default
