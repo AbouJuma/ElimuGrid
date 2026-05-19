@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Storage;
 
+use App\Traits\TenantModel;
+
 class Notification extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['title','message','image','send_to','session_year_id','school_id'];
 
     protected static function boot() {

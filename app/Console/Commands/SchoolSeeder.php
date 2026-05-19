@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\School;
 use App\Services\SchoolDataService;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 class SchoolSeeder extends Command
@@ -34,9 +34,7 @@ class SchoolSeeder extends Command
         $schoolService = app(SchoolDataService::class);
         foreach ($schools as $key => $school) {
             if ($school->database_name) {
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
                 /*
                 Permission

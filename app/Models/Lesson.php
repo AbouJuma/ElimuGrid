@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Models\SessionYearsTracking;
+use App\Traits\TenantModel;
 
 class Lesson extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'name',

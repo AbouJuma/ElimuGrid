@@ -12,28 +12,37 @@ return new class extends Migration {
      * Run the migrations.
      */
     public function up(): void {
-        Schema::table('packages', static function (Blueprint $table) {
-            $table->integer('days')->default(1)->after('staff_charge');
-        });
+        $schoolsTable = 'schools';
+        try {
+            Schema::table('packages', static function (Blueprint $table) {
+                $table->integer('days')->default(1)->after('staff_charge');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('subscription_bill_payments', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('subscription_bill_id')->references('id')->on('subscription_bills')->onDelete('cascade');
-            $table->date('date');
-            $table->float('amount');
-            $table->enum('payment_type', ['Cash', 'Cheque']);
-            $table->string('cheque_number')->nullable(true);
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('subscription_bill_payments', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->foreignId('subscription_bill_id')->references('id')->on('subscription_bills')->onDelete('cascade');
+                $table->date('date');
+                $table->float('amount');
+                $table->enum('payment_type', ['Cash', 'Cheque']);
+                $table->string('cheque_number')->nullable(true);
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('addon_subscriptions', static function (Blueprint $table) {
-            $table->foreignId('subscription_id')->after('id')->nullable(true)->references('id')->on('subscriptions')->onDelete('cascade');
-        });
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) {
+                $table->foreignId('subscription_id')->after('id')->nullable(true)->references('id')->on('subscriptions')->onDelete('cascade');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('fees', static function (Blueprint $table) {
-            $table->float('due_charges_amount')->after('due_charges');
-        });
+        try {
+            Schema::table('fees', static function (Blueprint $table) {
+                $table->float('due_charges_amount')->after('due_charges');
+            });
+        } catch (\Exception $e) {}
 
         /* Calculate Due charges amount */
         $fees = Fee::with(['fees_class_type' => function ($q) {
@@ -46,85 +55,107 @@ return new class extends Migration {
         });
         Fee::upsert($fees->toArray(), ['id'], ['due_charges_amount']);
 
-        Schema::table('fees_installments', static function (Blueprint $table) {
-            $table->enum('due_charges_type', ['fixed', 'percentage'])->default('percentage')->after('due_date');
-            $table->integer('due_charges')->comment('')->change();
-        });
+        try {
+            Schema::table('fees_installments', static function (Blueprint $table) {
+                $table->enum('due_charges_type', ['fixed', 'percentage'])->default('percentage')->after('due_date');
+                $table->integer('due_charges')->comment('')->change();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('galleries', static function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('description')->nullable(true);
-            $table->string('thumbnail')->nullable(true);
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('galleries', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('title');
+                $table->string('description')->nullable(true);
+                $table->string('thumbnail')->nullable(true);
+                $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('notifications', static function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('message')->nullable(true);
-            $table->string('image')->nullable(true);
-            $table->enum('send_to',['All users','Students','Guardian','Specific users','Over Due Fees']);
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('notifications', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('title');
+                $table->string('message')->nullable(true);
+                $table->string('image')->nullable(true);
+                $table->enum('send_to', ['All users', 'Students', 'Guardian', 'Specific users', 'Over Due Fees']);
+                $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('feature_sections', static function (Blueprint $table) {
-            $table->id();
-            $table->string('title');
-            $table->string('heading')->nullable(true);
-            $table->integer('rank')->default(0);
-            $table->timestamps();
-        });
+        try {
+            Schema::create('feature_sections', static function (Blueprint $table) {
+                $table->id();
+                $table->string('title');
+                $table->string('heading')->nullable(true);
+                $table->integer('rank')->default(0);
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('feature_section_lists', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('feature_section_id')->references('id')->on('feature_sections')->onDelete('cascade');
-            $table->string('feature')->nullable(true);
-            $table->text('description')->nullable(true);
-            $table->string('image')->nullable(true);
-            $table->timestamps();
-        });
+        try {
+            Schema::create('feature_section_lists', static function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('feature_section_id')->references('id')->on('feature_sections')->onDelete('cascade');
+                $table->string('feature')->nullable(true);
+                $table->text('description')->nullable(true);
+                $table->string('image')->nullable(true);
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        // Add date format in school settings
-        $data = [];
-        $schools = School::get();
-        foreach ($schools as $key => $school) {
-            $data[] = [
-                'name'      => 'date_format',
-                'data'      => 'd-m-Y',
-                'type'      => 'string',
-                'school_id' => $school->id,
-            ];
-            $data[] = [
-                'name'      => 'time_format',
-                'data'      => 'h:i A',
-                'type'      => 'string',
-                'school_id' => $school->id,
-            ];
-        }
-        SchoolSetting::upsert($data,['name','school_id'],['data','type']);
+        try {
+            // Add date format in school settings
+            $data = [];
+            $schools = DB::table('schools')->get();
+            foreach ($schools as $key => $school) {
+                $data[] = [
+                    'name'      => 'date_format',
+                    'data'      => 'd-m-Y',
+                    'type'      => 'string',
+                    'school_id' => $school->id,
+                ];
+                $data[] = [
+                    'name'      => 'time_format',
+                    'data'      => 'h:i A',
+                    'type'      => 'string',
+                    'school_id' => $school->id,
+                ];
+            }
+            if (!empty($data)) {
+                SchoolSetting::upsert($data, ['name', 'school_id'], ['data', 'type']);
+            }
+        } catch (\Exception $e) {}
 
         Cache::flush();
 
-        Schema::table('subscription_bills', static function (Blueprint $table) {
-            $table->double('amount',64,4)->change();
-        });
+        try {
+            Schema::table('subscription_bills', static function (Blueprint $table) {
+                $table->double('amount', 64, 4)->change();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('addon_subscriptions', static function (Blueprint $table) {
-            $table->double('price',64,4)->change();
-        });
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) {
+                $table->double('price', 64, 4)->change();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('expenses', static function (Blueprint $table) {
-            $table->double('amount',64,2)->change();
-        });
+        try {
+            Schema::table('expenses', static function (Blueprint $table) {
+                $table->double('amount', 64, 2)->change();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('fees_class_types', static function (Blueprint $table) {
-            $table->double('amount',64,2)->change();
-        });
+        try {
+            Schema::table('fees_class_types', static function (Blueprint $table) {
+                $table->double('amount', 64, 2)->change();
+            });
+        } catch (\Exception $e) {}
 
         // Soft delete school admin if school_id null, Because of super admin has change school admin softdelete old school admin due to many issue has occur like login, forgot password, etc...  
         $schools = School::onlyTrashed()->pluck('admin_id')->toArray();
@@ -136,6 +167,7 @@ return new class extends Migration {
      * Reverse the migrations.
      */
     public function down(): void {
+        $schoolsTable = 'schools';
         Schema::table('packages', static function (Blueprint $table) {
             $table->dropColumn('days');
         });

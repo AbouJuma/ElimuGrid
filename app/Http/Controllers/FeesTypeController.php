@@ -33,7 +33,7 @@ class FeesTypeController extends Controller {
         ResponseService::noFeatureThenRedirect('Fees Management');
         ResponseService::noPermissionThenRedirect('fees-type-create');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $feesType = $this->feesType->create($request->except('_token'));
             $sessionYear = $this->cache->getDefaultSessionYear();
             $semester = $this->cache->getDefaultSemesterData();
@@ -42,10 +42,10 @@ class FeesTypeController extends Controller {
             } else {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\FeesType', $feesType->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "FeesTypeController -> store method");
             ResponseService::errorResponse();
         }

@@ -156,7 +156,7 @@ Route::group(['prefix' => 'install'], static function () {
 });
 
 // auth
-Route::group(['middleware' => ['Role', 'checkSchoolStatus', 'status','SwitchDatabase','verifiedEmail','CheckForMaintenanceMode','2fa','wizardSettings']], static function () {
+Route::group(['middleware' => ['CheckForMaintenanceMode', 'wizardSettings', 'customAuth']], static function () {
 
     Route::group(['middleware' => 'language'], static function () {
 
@@ -1016,6 +1016,9 @@ Route::group(['middleware' => ['Role', 'checkSchoolStatus', 'status','SwitchData
         Route::get('reports/exam/rank-wise-result-statistics', [ReportsController::class, 'rankWiseResultStatistics'])->name('reports.exam.rank-wise-result-statistics');
         Route::get('reports/exam/rank-wise-top-performers', [ReportsController::class, 'rankWiseTopPerformers'])->name('reports.exam.rank-wise-top-performers');
         Route::get('reports/exam/rank-wise-result/bulk-rank-result', [ReportsController::class, 'bulkRankWiseResult'])->name('reports.exam.bulk-rank-result');
+
+        // Virtual Classroom Routes
+        require __DIR__ . '/virtual_classroom.php';
     });
 });
 
@@ -1214,6 +1217,3 @@ Route::get('demo-tokens', static function () {
         });
     }
 });
-
-// Virtual Classroom Routes
-require __DIR__ . '/virtual_classroom.php';

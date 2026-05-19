@@ -215,7 +215,7 @@ class ClassSectionController extends Controller {
     public function update(Request $request, $id) {
         ResponseService::noPermissionThenRedirect('class-section-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Initialize Empty Arrays
             $classTeachersData = array();
@@ -288,10 +288,10 @@ class ClassSectionController extends Controller {
             }
 
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -327,14 +327,14 @@ class ClassSectionController extends Controller {
     public function restore(int $id) {
         ResponseService::noPermissionThenSendJson('class-section-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $classSection = $this->classSection->findOnlyTrashedById($id);
             $classSection->class->restore();
             $classSection->restore();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Restored Successfully");
         } catch (Throwable $e) {
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -354,7 +354,7 @@ class ClassSectionController extends Controller {
     public function removeClassTeacher($classTeacherID, $classSectionID) {
         ResponseService::noPermissionThenRedirect('class-section-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->classTeachers->builder()->where(['class_section_id' => $classSectionID, 'teacher_id' => $classTeacherID])->delete();
             $teacher = $this->user->findById($classTeacherID);
 
@@ -363,10 +363,10 @@ class ClassSectionController extends Controller {
             if (!$classTeachers) {
                 $teacher->revokePermissionTo(['class-teacher', 'exam-upload-marks', 'exam-result']);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -375,16 +375,16 @@ class ClassSectionController extends Controller {
     public function removeSubjectTeacher($classSectionID, $teacherID, $subjectID) {
         ResponseService::noPermissionThenRedirect('class-section-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $subjectTeachers =   $this->subjectTeachers->builder()->where('teacher_id',$teacherID)->first();
             if (!$subjectTeachers) {
                 $this->user->findById($teacherID)->revokePermissionTo(['exam-upload-marks', 'exam-result']);
             }
             $this->subjectTeachers->builder()->where(['class_section_id' => $classSectionID, 'teacher_id' => $teacherID, 'subject_id' => $subjectID])->delete();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

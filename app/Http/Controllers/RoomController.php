@@ -38,15 +38,11 @@ class RoomController extends Controller
     public function getRooms(Request $request)
     {
         try {
-            $query = DB::connection('school')->table('rooms as r')
-                ->leftJoin('hostels as h', 'r.hostel_id', '=', 'h.id')
-                ->whereNull('r.deleted_at')
-                ->where('r.school_id', Auth::user()->school_id)
-                ->select('r.*', 'h.name as hostel_name');
+            $query = Room::owner()->with('hostel');
 
             // Filter by hostel if provided
             if ($request->has('hostel_id') && $request->hostel_id) {
-                $query->where('r.hostel_id', $request->hostel_id);
+                $query->where('hostel_id', $request->hostel_id);
             }
 
             $rooms = $query->get();
@@ -61,7 +57,7 @@ class RoomController extends Controller
 
                 return [
                     'id' => $room->id,
-                    'hostel_name' => $room->hostel_name ?? 'Unknown',
+                    'hostel_name' => $room->hostel->name ?? 'Unknown',
                     'room_number' => $room->room_number,
                     'capacity' => $room->capacity,
                     'occupied_beds' => $room->occupied_beds,
@@ -91,7 +87,7 @@ class RoomController extends Controller
         ResponseService::noPermissionThenRedirect('room-create');
 
         $validator = Validator::make($request->all(), [
-            'hostel_id' => 'required|exists:hostels,id',
+            'hostel_id' => 'required|exists:' . (new Hostel)->getTable() . ',id',
             'room_number' => 'required|string|max:50',
             'capacity' => 'required|integer|min:1',
         ]);
@@ -101,7 +97,7 @@ class RoomController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check if room number already exists in this hostel
             $existingRoom = Room::owner()
@@ -121,7 +117,7 @@ class RoomController extends Controller
                 'school_id' => Auth::user()->school_id,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -129,7 +125,7 @@ class RoomController extends Controller
                 'data' => $room
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to create room: ' . $e->getMessage()], 500);
         }
     }
@@ -168,7 +164,7 @@ class RoomController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $room = Room::owner()->findOrFail($id);
 
@@ -193,7 +189,7 @@ class RoomController extends Controller
                 'capacity' => $request->capacity,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -201,7 +197,7 @@ class RoomController extends Controller
                 'data' => $room
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to update room: ' . $e->getMessage()], 500);
         }
     }
@@ -215,14 +211,14 @@ class RoomController extends Controller
         ResponseService::noPermissionThenRedirect('room-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $room = Room::owner()->findOrFail($id);
 
-            // Check if room has active allocations
-            $activeAllocations = DB::connection('school')->table('hostel_allocations')
+            // Check if room has active allocations using prefix-safe Eloquent model
+            $activeAllocations = \App\Models\HostelAllocation::owner()
                 ->where('room_id', $id)
-                ->where('status', 'active')
+                ->active()
                 ->count();
 
             if ($activeAllocations > 0) {
@@ -231,14 +227,14 @@ class RoomController extends Controller
 
             $room->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Room deleted successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to delete room: ' . $e->getMessage()], 500);
         }
     }

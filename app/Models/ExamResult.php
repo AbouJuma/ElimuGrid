@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
 class ExamResult extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = [
         'exam_id',
         'class_section_id',

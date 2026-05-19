@@ -18,8 +18,6 @@ use App\Repositories\User\UserInterface;
 use Auth;
 use Carbon\Carbon;
 use DB;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Stripe\Stripe;
 use Stripe\Checkout\Session as StripeSession;
@@ -176,9 +174,7 @@ class SubscriptionService
         // GenerateBill [ null => Generate immediate bill, 1 => Generate regular bill ]
 
         // Set school database connection for getting user counts
-        Config::set('database.connections.school.database', $subscription->school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($subscription->school->database_name);
         DB::setDefaultConnection('school');
 
         // $students = User::on('school')->withTrashed()->where(function ($q) use ($subscription) {

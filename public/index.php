@@ -16,7 +16,7 @@ define('LARAVEL_START', microtime(true));
 |
 */
 
-if (file_exists($maintenance = __DIR__ . '/elimuGrid/storage/framework/maintenance.php')) {
+if (file_exists($maintenance = __DIR__ . '/../storage/framework/maintenance.php')) {
     require $maintenance;
 }
 
@@ -31,7 +31,19 @@ if (file_exists($maintenance = __DIR__ . '/elimuGrid/storage/framework/maintenan
 |
 */
 
-require __DIR__ . '/elimuGrid/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +56,7 @@ require __DIR__ . '/elimuGrid/vendor/autoload.php';
 |
 */
 
-$app = require_once __DIR__ . '/elimuGrid/bootstrap/app.php';
+$app = require_once __DIR__ . '/../bootstrap/app.php';
 
 $kernel = $app->make(Kernel::class);
 

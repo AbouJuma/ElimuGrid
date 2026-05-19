@@ -13,17 +13,21 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('hostels', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->text('description')->nullable();
-            $table->unsignedBigInteger('school_id');
-            $table->timestamps();
-            $table->softDeletes();
+        try {
+            if (!Schema::hasTable('hostels')) {
+                Schema::create('hostels', function (Blueprint $table) {
+                    $table->id();
+                    $table->string('name');
+                    $table->text('description')->nullable();
+                    $table->unsignedBigInteger('school_id');
+                    $table->timestamps();
+                    $table->softDeletes();
 
-            $table->index('school_id');
-            $table->index('name');
-        });
+                    $table->index('school_id');
+                    $table->index('name');
+                });
+            }
+        } catch (\Exception $e) {}
     }
 
     /**

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Salary Slip || {{ $schoolSetting['school_name'] }}</title>
+    <title>Salary Slip || {{ $schoolSetting['school_name'] ?? '' }}</title>
 
     <style>
         * {
@@ -199,7 +199,7 @@
                 <th class="text-left" width="50">
                     
                     @if ($schoolSetting['horizontal_logo'] ?? '')
-                        <img class="school-logo" height="50" src="{{ public_path('storage/') . $schoolSetting['horizontal_logo'] }}" alt="">                    
+                        <img class="school-logo" height="50" src="{{ public_path('storage/') . ($schoolSetting['horizontal_logo'] ?? '') }}" alt="">                    
                     @else
                         <img height="40" src="{{ public_path('assets/horizontal-logo2.svg') }}" alt="">
                     @endif
@@ -207,10 +207,10 @@
                 </th>
                 <th class="text-left school-name-address">
                     <div class="school-name">
-                        {{ $schoolSetting['school_name'] }}
+                        {{ $schoolSetting['school_name'] ?? '' }}
                     </div>
                     <div class="school-address">
-                        {{ $schoolSetting['school_address'] }}
+                        {{ $schoolSetting['school_address'] ?? '' }}
                     </div>
                 </th>
                 <th class="text-right" width="140">

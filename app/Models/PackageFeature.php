@@ -10,6 +10,7 @@ class PackageFeature extends Model {
     use HasFactory;
 
     protected $fillable = ['package_id', 'feature_id'];
+    protected $connection = 'mysql';
 
     /**
      * Get the feature that owns the PackageFeature

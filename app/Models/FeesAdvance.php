@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantModel;
 
 class FeesAdvance extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $table = 'fees_advance';
     protected $fillable = [
         'compulsory_fee_id',

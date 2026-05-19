@@ -40,7 +40,7 @@ class LanguageManager
                     if (Session::has('landing_locale')) {
                         app()->setLocale(Session::get('landing_locale'));
                     } else {
-                        $lang = env('APPLANG');
+                        $lang = config('app.app_lang');
                         if (is_null($lang)) {
                             $lang = "en";
                         }

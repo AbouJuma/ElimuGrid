@@ -104,7 +104,7 @@ class ExamController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $examData = [];
 
@@ -164,17 +164,17 @@ class ExamController extends Controller
 
             send_notification($users, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist',
                 'file_get_contents'
                 ])) {
-                    DB::commit();
+                    DB::connection('mysql')->commit();
                     ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
                 } else {
-                    DB::rollBack();
+                    DB::connection('mysql')->rollBack();
                     ResponseService::logErrorResponse($e, "Exam Controller -> Store method");
                     ResponseService::errorResponse();
             }
@@ -330,7 +330,7 @@ class ExamController extends Controller
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Exam', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Controller -> Delete method");
             ResponseService::errorResponse();
         }
@@ -638,7 +638,7 @@ class ExamController extends Controller
             'edit.*.obtained_marks' => 'required|numeric|lte:edit.*.total_marks'
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // Loop Through Request Data
             foreach ($request->edit as $data) {
                 $passingMarks = $data['passing_marks']; // Get Passing Marks
@@ -691,10 +691,10 @@ class ExamController extends Controller
                     $this->examResult->update($examResultId, $examResultData); // Update Exam Result
                 }
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Controller -> updateExamResultMarks method");
             ResponseService::errorResponse();
         }
@@ -730,7 +730,7 @@ class ExamController extends Controller
             
             
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             if ($exam->exam_status == 2 && $exam->marks->isNotEmpty()) {
 
                 if ($exam->publish == 0) {
@@ -780,7 +780,7 @@ class ExamController extends Controller
                     ExamResult::where('exam_id', $id)->delete(); // If Exam is already published then unpublished it and delete Exam Result
                     $this->exam->update($id, ['publish' => 0]); // Update Exam with Publish status 0
                 }
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse('Data Stored Successfully');
             } else {
                 ResponseService::errorResponse('Exam not completed yet');
@@ -791,10 +791,10 @@ class ExamController extends Controller
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Controller -> publishExamResult method");
             ResponseService::errorResponse();
             }
@@ -818,14 +818,14 @@ class ExamController extends Controller
     {
         ResponseService::noPermissionThenSendJson('exam-timetable-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->examTimetable->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\ExamTimetable', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Controller -> DeleteTimetable method", trans('cannot_delete_because_data_is_associated_with_other_data'));
             ResponseService::errorResponse();
         }
@@ -841,7 +841,7 @@ class ExamController extends Controller
 
             ResponseService::successResponse('Data Fetched Successfully', $exams);
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -861,7 +861,7 @@ class ExamController extends Controller
 
             return view('exams.exams_timetable', compact('class_sections', 'exams'));
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -893,7 +893,7 @@ class ExamController extends Controller
             $bulkData['rows'] = $rows;
             return response()->json($bulkData);
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

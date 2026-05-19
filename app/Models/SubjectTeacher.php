@@ -5,9 +5,10 @@ namespace App\Models;
 use App\Services\CachingService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-
+use App\Traits\TenantModel;
 
 class SubjectTeacher extends Model {
+    use TenantModel;
 
     protected $fillable = [
         'class_section_id',

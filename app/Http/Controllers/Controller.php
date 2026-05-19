@@ -25,6 +25,7 @@ use App\Services\CachingService;
 use App\Services\GeneralFunctionService;
 use App\Services\ResponseService;
 use App\Services\SubscriptionService;
+use App\Services\SharedHostingTenantService;
 use App\Services\UploadService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -213,9 +214,7 @@ class Controller extends BaseController {
     public function school_website($school)
     {
 
-        Config::set('database.connections.school.database', $school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
         DB::setDefaultConnection('school');
 
         $sliders = Slider::where('school_id',$school->id)->whereIn('type',[2,3])->get();
@@ -254,7 +253,7 @@ class Controller extends BaseController {
         $host = request()->getHost();
         $host = str_replace('www.', '', $host);
     
-        $appUrlHost = parse_url(env('APP_URL'), PHP_URL_HOST);
+        $appUrlHost = parse_url(config('app.url'), PHP_URL_HOST);
         $appUrlHost = str_replace('www.', '', $appUrlHost);
     
         $isLocal = in_array(request()->ip(), ['127.0.0.1', '::1']);
@@ -291,7 +290,7 @@ class Controller extends BaseController {
                 'admin_email' => $admin_email
             ];
 
-            if (env('RECAPTCHA_SECRET_KEY') ?? '') {
+            if (config('services.recaptcha.secret') ?? '') {
                 $validator = Validator::make($request->all(), [
                     'g-recaptcha-response' => 'required',
                 ]);
@@ -452,9 +451,7 @@ class Controller extends BaseController {
 
             try {
                 
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
                 
                 $this->contactInquiry->create($request->only(['name', 'email', 'subject', 'message']));
@@ -560,9 +557,7 @@ class Controller extends BaseController {
  
         $school = School::on('mysql')->where('domain', $fullDomain)->orwhere('domain', $subdomain)->first();
         
-        Config::set('database.connections.school.database', $school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
         DB::setDefaultConnection('school');
 
         // $schoolId = $school->id;
@@ -596,7 +591,7 @@ class Controller extends BaseController {
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $admission_date = Carbon::now()->format('Y-m-d');
             $fullDomain = $_SERVER['HTTP_HOST'];
             $parts = explode('.', $fullDomain);
@@ -604,9 +599,7 @@ class Controller extends BaseController {
      
             $school = School::on('mysql')->where('domain', $fullDomain)->orwhere('domain', $subdomain)->first();
 
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
 
             // $defaultSessionYear = SessionYear::where('school_id',$school->id)->where('default', 1)->first();
@@ -723,10 +716,10 @@ class Controller extends BaseController {
                 $this->extraFormFields->createBulk($extraDetails);
             }
         
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Student Registered successfully');
         } catch (Throwable $e) {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Student Controller -> Store method");
                 ResponseService::errorResponse();
         }
@@ -778,16 +771,13 @@ class Controller extends BaseController {
     {
         $school_database_name = Session::get('school_database_name');
         if ($school_database_name) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school_database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database_name);
             DB::setDefaultConnection('school');
             if (Auth::user()) {
                 $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
             }
         } else {
-            DB::purge('school');
+            SharedHostingTenantService::resetSchoolDatabaseConnection();
             DB::connection('mysql')->reconnect();
             DB::setDefaultConnection('mysql');
 

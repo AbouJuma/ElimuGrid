@@ -78,16 +78,16 @@ class AddonController extends Controller {
             'feature_id.unique'   => trans('you_have_previously_created_an_addon_for_this_feature'),
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [
                 ...$request->all(),
                 'status'     => 0
             ];
             $this->addon->create($data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Store Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Store method');
             ResponseService::errorResponse();
         }
@@ -164,15 +164,15 @@ class AddonController extends Controller {
             'price.required' => 'The price is required',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [
                 ...$request->all(),
             ];
             $this->addon->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data updated successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Update method');
             ResponseService::errorResponse();
         }
@@ -181,12 +181,12 @@ class AddonController extends Controller {
     public function destroy($id) {
         ResponseService::noPermissionThenSendJson('addons-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->addon->findById($id)->delete();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data deleted successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Delete method');
             ResponseService::errorResponse();
         }
@@ -195,12 +195,12 @@ class AddonController extends Controller {
     public function restore($id) {
         ResponseService::noPermissionThenSendJson('addons-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->addon->restoreById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data restore successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Restore method');
             ResponseService::errorResponse();
         }
@@ -209,7 +209,7 @@ class AddonController extends Controller {
     public function trash($id) {
         ResponseService::noPermissionThenSendJson('addons-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $addon = $this->addon->findOnlyTrashedById($id);
             if (count($addon->addon_subscription)) {
                 ResponseService::errorResponse('cannot_delete_because_data_is_associated_with_other_data');
@@ -218,10 +218,10 @@ class AddonController extends Controller {
             }
 
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data deleted successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Trash method');
             ResponseService::errorResponse();
         }
@@ -230,21 +230,21 @@ class AddonController extends Controller {
     public function status($id) {
         ResponseService::noAnyPermissionThenSendJson(['addons-create', 'addons-edit']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $addon = $this->addon->findById($id);
             $addon = ['status' => $addon->status == 1 ? 0 : 1];
             $this->addon->update($id, $addon);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Status method');
             ResponseService::errorResponse();
         }
     }
 
     public function subscribe($id, $type) {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -253,7 +253,7 @@ class AddonController extends Controller {
         }
         ResponseService::noRoleThenRedirect('School Admin');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $addon_id = $id;
             $date = Carbon::now()->format('Y-m-d');
             // $subscription = $this->subscription->builder()->with('package')->where('start_date', '<=', $date)->where('end_date', '>=', $date)->doesntHave('subscription_bill')->first();
@@ -310,7 +310,7 @@ class AddonController extends Controller {
             // createBulk
             $addonSubscription = $this->addonSubscription->create($data);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             // If prepaid plan receive payment first
             if ($type == 0) {
                 $response = [
@@ -326,14 +326,14 @@ class AddonController extends Controller {
             // $this->addonSubscription->upsert($data,['school_id','addon_id'],['price','start_date','end_date']);
             ResponseService::successResponse('Addon added successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> subscribe method');
             ResponseService::errorResponse();
         }
     }
 
     public function discontinue($id) {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -342,12 +342,12 @@ class AddonController extends Controller {
         }
         ResponseService::noRoleThenRedirect('School Admin');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->addonSubscription->update($id, ['status' => 0]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Addon discontinue successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Addon Controller -> Discontinue method');
             ResponseService::errorResponse();
         }
@@ -355,7 +355,7 @@ class AddonController extends Controller {
 
     public function prepaid_package_addon($id)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -366,7 +366,7 @@ class AddonController extends Controller {
         try {
             return $this->subscriptionService->prepaid_addon_payment($id);
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, 'Addon Controller -> Prepaid Package Addon method');
             ResponseService::errorResponse();
         }

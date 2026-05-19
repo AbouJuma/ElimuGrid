@@ -8,9 +8,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class ExpenseCategory extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TenantModel;
     protected $fillable = ['name', 'description', 'school_id'];
 
     public function scopeOwner()

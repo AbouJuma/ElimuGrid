@@ -6,7 +6,7 @@ use App\Models\School;
 use App\Models\User;
 use App\Repositories\Base\BaseRepository;
 use App\Services\UploadService;
-use Illuminate\Support\Facades\Config;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -155,9 +155,7 @@ class SchoolRepository extends BaseRepository implements SchoolInterface {
         }
         
 
-        Config::set('database.connections.school.database', $school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
         DB::setDefaultConnection('school');
 
         DB::connection('school')->table('users')->upsert($userRow,['id']);

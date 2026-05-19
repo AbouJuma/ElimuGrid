@@ -6,9 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class LeaveMaster extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['leaves','holiday','session_year_id','school_id'];
     protected $hidden = ['created_at','updated_at'];
     

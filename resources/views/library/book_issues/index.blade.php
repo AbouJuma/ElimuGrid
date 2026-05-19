@@ -17,7 +17,7 @@
                                     <select name="class_id" id="class_id" class="form-control select2" required>
                                         <option value="">{{ __('Select Class') }}</option>
                                         @foreach ($classes as $class)
-                                            <option value="{{ $class->id }}">{{ $class->name }}</option>
+                                            <option value="{{ $class->id }}">{{ $class->full_name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -73,7 +73,7 @@
                             <select name="filter_class" id="filter_class" class="form-control">
                                 <option value="">{{ __('All Classes') }}</option>
                                 @foreach ($classes as $class)
-                                    <option value="{{ $class->id }}">{{ $class->name }}</option>
+                                    <option value="{{ $class->id }}">{{ $class->full_name }}</option>
                                 @endforeach
                             </select>
                             <label for="filter_student" class="filter-menu ml-2">{{ __('Filter by Student') }}</label>

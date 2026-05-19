@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class Leave extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = ['user_id','reason','from_date','to_date','status','school_id','leave_master_id'];
 

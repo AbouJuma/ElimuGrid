@@ -6,9 +6,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+use App\Traits\TenantModel;
+
 class Grade extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'starting_range',

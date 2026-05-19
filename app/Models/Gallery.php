@@ -6,10 +6,11 @@ use Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\TenantModel;
 
 class Gallery extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = [
         'title','description','thumbnail','session_year_id','school_id'
     ];

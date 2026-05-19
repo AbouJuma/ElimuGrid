@@ -172,6 +172,7 @@
         // Load sections when class changes
         $('#class_id').on('change', function() {
             var classId = $(this).val();
+            console.log('Class changed to:', classId);
 
             if (classId) {
                 // Load sections
@@ -180,10 +181,15 @@
                     type: 'GET',
                     data: { class_id: classId },
                     success: function(data) {
+                        console.log('Loaded sections successfully:', data);
                         $('#section_id').empty().append('<option value="">Select Section (Optional)</option>');
                         $.each(data, function(key, section) {
                             $('#section_id').append('<option value="' + section.id + '">' + section.name + '</option>');
                         });
+                        $('#section_id').trigger('change');
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Failed to load sections:', status, error, xhr.responseText);
                     }
                 });
 
@@ -193,15 +199,20 @@
                     type: 'GET',
                     data: { class_id: classId },
                     success: function(data) {
+                        console.log('Loaded subjects successfully:', data);
                         $('#subject_id').empty().append('<option value="">Select Subject</option>');
                         $.each(data, function(key, subject) {
                             $('#subject_id').append('<option value="' + subject.id + '">' + subject.name + '</option>');
                         });
+                        $('#subject_id').trigger('change');
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Failed to load subjects:', status, error, xhr.responseText);
                     }
                 });
             } else {
-                $('#section_id').empty().append('<option value="">Select Section (Optional)</option>');
-                $('#subject_id').empty().append('<option value="">Select Subject</option>');
+                $('#section_id').empty().append('<option value="">Select Section (Optional)</option>').trigger('change');
+                $('#subject_id').empty().append('<option value="">Select Subject</option>').trigger('change');
             }
         });
 

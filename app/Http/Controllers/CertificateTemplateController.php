@@ -86,7 +86,7 @@ class CertificateTemplateController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $page_layout = 'A4 Landscape';
             if ($request->height == 210 && $request->width == 297) {
@@ -116,10 +116,10 @@ class CertificateTemplateController extends Controller
             $certificateTemplate = $this->certificateTemplate->create($data);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\CertificateTemplate', $certificateTemplate->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Certificate Template Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -212,7 +212,7 @@ class CertificateTemplateController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $page_layout = 'A4 Landscape';
             if ($request->height == 210 && $request->width == 297) {
@@ -241,10 +241,10 @@ class CertificateTemplateController extends Controller
             }
 
             $this->certificateTemplate->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Certificate Template Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -259,14 +259,14 @@ class CertificateTemplateController extends Controller
         ResponseService::noFeatureThenRedirect('ID Card - Certificate Generation');
         ResponseService::noPermissionThenSendJson('certificate-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->certificateTemplate->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\CertificateTemplate', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Certificate Template Controller -> Destroy Method");
             ResponseService::errorResponse();
         }

@@ -4,9 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
-
+use App\Traits\TenantModel;
 
 class Staff extends Model {
+    use TenantModel;
     protected $table = "staffs";
     protected $fillable = [
         'user_id',

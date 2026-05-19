@@ -17,8 +17,27 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 
+use App\Traits\TenantModel;
+
 class User extends Authenticatable implements MustVerifyEmail {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, HasPermissions;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasPermissions;
+    use HasRoles {
+        hasRole as traitHasRole;
+    }
+    use TenantModel;
+
+    public function hasRole($roles, $guard = null): bool
+    {
+        try {
+            return $this->traitHasRole($roles, $guard);
+        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
+            return false;
+        }
+    }
+
+    protected $connection = 'mysql';
+
+    protected $with = ['roles'];
 
     /**
      * The attributes that are mass assignable.
@@ -321,9 +340,7 @@ class User extends Authenticatable implements MustVerifyEmail {
     public function getRoleAttribute()
     {
         if ($this->relationLoaded('roles')) {
-            // return $this->full_name .' #'. $this->roles()->first()->name;
-            return $this->roles()->first()->name;
-            // return $this->roles()->first();
+            return $this->roles->first()->name ?? '';
         }
         return '';
     }
@@ -338,12 +355,6 @@ class User extends Authenticatable implements MustVerifyEmail {
         return $this->hasMany(ClassTeacher::class, 'teacher_id');
     }
 
-    public function getConnectionName()
-    {
-        // Replace this with your logic to determine the connection name
-        // For example, you might get it from session or config
-        return session('db_connection_name') ?? config('database.default');
-    }
 
     /**
      * Get all of the student_subject for the User

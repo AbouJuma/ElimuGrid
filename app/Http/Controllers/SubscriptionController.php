@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\DB;
 use Stripe\Checkout\Session as StripeSession;
 use Stripe\Exception\ApiErrorException;
 use App\Services\SubscriptionService;
-use Illuminate\Support\Facades\Config;
+use App\Services\SharedHostingTenantService;
 use PhpParser\Node\Stmt\TryCatch;
 use Razorpay\Api\Api;
 use Stripe\Stripe;
@@ -121,7 +121,7 @@ class SubscriptionController extends Controller
 
     public function store(Request $request)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -143,7 +143,7 @@ class SubscriptionController extends Controller
 
     public function plan($id, $type, $isCurrentPlan = null)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -153,7 +153,7 @@ class SubscriptionController extends Controller
         // Store subscription plan
         ResponseService::noRoleThenRedirect('School Admin');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $package_id = $id;
             
             // Check pending bills
@@ -207,11 +207,11 @@ class SubscriptionController extends Controller
                 
                 $subscription = $this->subscriptionService->createSubscription($package_id, null, null, 1);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             
             ResponseService::successResponse(trans('Package Subscription Successfully'));
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Subscription Controller -> Plan method');
             ResponseService::errorResponse();
         }
@@ -219,7 +219,7 @@ class SubscriptionController extends Controller
 
     public function prepaid_plan($package_id, $type = null, $isCurrentPlan = null)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -242,7 +242,7 @@ class SubscriptionController extends Controller
             
             
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, 'Subscription Controller -> Prepaid Plan method');
             ResponseService::errorResponse();
         }
@@ -413,7 +413,7 @@ class SubscriptionController extends Controller
 
     public function cancel_upcoming($id = null)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -449,7 +449,7 @@ class SubscriptionController extends Controller
 
     public function confirm_upcoming_plan($id)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -458,7 +458,7 @@ class SubscriptionController extends Controller
         }
         ResponseService::noRoleThenRedirect('School Admin');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $message = 'Your Upcoming Billing Cycle Plan Has Been Added Successfully';
             // $current_subscription = $this->subscription->default()->with('package')->first();
             $current_subscription = $this->subscriptionService->active_subscription(Auth::user()->school_id);
@@ -502,10 +502,10 @@ class SubscriptionController extends Controller
             $this->schoolSettings->upsert($data, ["name"], ["data"]);
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse($message);
         } catch (\Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Subscription Controller -> Confirm Upcoming Plan method');
             ResponseService::errorResponse();
         }
@@ -622,7 +622,7 @@ class SubscriptionController extends Controller
 
     public function payment_cancel($subscriptionBillId = null)
     {
-        DB::rollBack();
+        DB::connection('mysql')->rollBack();
         if ($subscriptionBillId != -1) {
             $subscriptionBill = $this->subscriptionBill->findById($subscriptionBillId,['*'],['subscription']);
             if ($subscriptionBill->subscription->package_type == 0) {
@@ -667,10 +667,7 @@ class SubscriptionController extends Controller
         $start_date = Carbon::parse($subscriptionBill->subscription->start_date);
         $usage_days = $start_date->diffInDays(Carbon::parse($subscriptionBill->subscription->end_date)) + 1;
 
-        DB::setDefaultConnection('school');
-        Config::set('database.connections.school.database', $subscriptionBill->school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($subscriptionBill->school->database_name);
         DB::setDefaultConnection('school');
         $school_settings = app(CachingService::class)->getSchoolSettings('*', $subscriptionBill->school_id)->toArray();
 
@@ -835,7 +832,7 @@ class SubscriptionController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $subscription = $this->subscription->findById($request->id);
             $upcoming_package_start_date = Carbon::parse($subscription->end_date)->addDay()->format('Y-m-d');
@@ -853,7 +850,7 @@ class SubscriptionController extends Controller
             $this->subscription->update((int)$request->id, ['end_date' => $end_date, 'school_id' => $request->school_id]);
 
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.FEATURES'), $request->school_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -869,10 +866,10 @@ class SubscriptionController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $due_date = date('Y-m-d', strtotime($request->due_date));
             $this->subscriptionBill->update($request->id, ['due_date' => $due_date, 'school_id' => $request->school_id]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -882,7 +879,7 @@ class SubscriptionController extends Controller
 
     public function start_immediate_plan($id = null, $type = null)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -891,7 +888,7 @@ class SubscriptionController extends Controller
         }
         ResponseService::noRoleThenRedirect('School Admin');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check previous pending bills
             $subscriptionBill = $this->subscriptionService->subscriptionPendingBill();
@@ -930,7 +927,7 @@ class SubscriptionController extends Controller
 
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.FEATURES'));
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             // Create new subscription plan
             if ($type == 0) {
                 // return json respons
@@ -963,7 +960,7 @@ class SubscriptionController extends Controller
 
     public function update_current_plan(Request $request)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -972,7 +969,7 @@ class SubscriptionController extends Controller
         }
         ResponseService::noPermissionThenRedirect('subscription-change-bills');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Get active plan
             $subscription = $this->subscription->builder()->where('id', $request->id)->first();
@@ -1014,7 +1011,7 @@ class SubscriptionController extends Controller
             $this->addonSubscription->builder()->whereIn('id', $soft_delete_addon)->delete();
 
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.FEATURES'), $new_subscription->school_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -1027,7 +1024,7 @@ class SubscriptionController extends Controller
         //
         ResponseService::noPermissionThenSendJson('subscription-change-bills');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $subscription = $this->subscription->findById($id);
             // $school_settings = [
             //     'name' => 'auto_renewal_plan',
@@ -1045,10 +1042,10 @@ class SubscriptionController extends Controller
             $this->subscription->deleteById($id);
 
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'), $subscription->school_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Auto-renewal successfully canceled');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Subscription Controller -> Destroy method');
             ResponseService::errorResponse();
         }
@@ -1057,7 +1054,7 @@ class SubscriptionController extends Controller
     public function generate_bill($id)
     {
         ResponseService::noPermissionThenSendJson('subscription-change-bills');
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -1065,7 +1062,7 @@ class SubscriptionController extends Controller
             ));
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $subscription = $this->subscription->findById($id);
             $today_date = Carbon::now()->format('Y-m-d');
 
@@ -1138,10 +1135,10 @@ class SubscriptionController extends Controller
             }
 
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('bill generated successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Subscription Controller -> Generate bill method');
             ResponseService::errorResponse();
         }
@@ -1268,7 +1265,7 @@ class SubscriptionController extends Controller
 
     public function bill_payment_store(Request $request, $id)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -1279,7 +1276,7 @@ class SubscriptionController extends Controller
         $subscriptionBill = $this->subscriptionBill->findById($id);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $billData = [
                 'user_id' => $subscriptionBill->school->admin_id,
                 'amount' => $request->amount,
@@ -1297,10 +1294,10 @@ class SubscriptionController extends Controller
 
             $this->subscriptionBill->update($id,['payment_transaction_id' => $paymentTransaction->id, 'school_id' => $request->school_id]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully'); 
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();
         }
@@ -1309,7 +1306,7 @@ class SubscriptionController extends Controller
 
     public function delete_bill_payment($id)
     {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -1318,15 +1315,15 @@ class SubscriptionController extends Controller
         }
         ResponseService::noPermissionThenRedirect('subscription-bill-payment');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
          
             $this->subscriptionBill->builder()->where('payment_transaction_id',$id)->update(['payment_transaction_id' => null]);
             $this->paymentTransaction->deleteById($id);
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();
         }
@@ -1336,7 +1333,7 @@ class SubscriptionController extends Controller
     {
         // $type [ 0 => Create new subscription with payment, 1 => Already added, updated the records, generated bills, and made the necessary payments ]
         ResponseService::noRoleThenRedirect('School Admin');
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -1346,7 +1343,7 @@ class SubscriptionController extends Controller
         
         try {
             // type, update/create
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // if ($type == 1) {
             //     // Update records
             //     $subscription = $this->subscriptionService->createSubscription($subscription->package_id, NULL, $subscription->id);
@@ -1373,12 +1370,12 @@ class SubscriptionController extends Controller
                 return $this->subscriptionService->flutterwave_payment(null, $package_id, $type, $subscription_id);
             }
 
-            // DB::commit();
+            // DB::connection('mysql')->commit();
             // return $subscription = $this->prepaid_plan($package_id, $type, $subscription_id);
             
             return redirect()->route('dashboard')->with('error',trans('server_not_responding'));
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return redirect()->route('dashboard')->with('error',trans('server_not_responding'));
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();

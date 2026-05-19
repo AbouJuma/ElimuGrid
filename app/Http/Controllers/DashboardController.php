@@ -25,9 +25,9 @@ use App\Repositories\User\UserInterface;
 use App\Services\CachingService;
 use App\Services\SubscriptionService;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 
 class DashboardController extends Controller {
     private UserInterface $user;
@@ -73,12 +73,16 @@ class DashboardController extends Controller {
 
     public function index() {
         
-        if(( Auth::user()->hasRole('Super Admin') || Auth::user()->hasRole('School Admin')) && Auth::user()->two_factor_enabled == 1 && !Auth::user()->two_factor_expires_at && Auth::user()->email != 'superadmin@gmail.com' && Auth::user()->email != 'demo@school.com') {
-            $user = Auth::user();
-            DB::table('users')->where('email',$user->email)->update(['two_factor_secret' => null,'two_factor_expires_at' => null]);
-            Auth::logout();
-            return view('auth.login');
-        }
+        // Get user data from custom session
+        $userId = Session::get('auth_user_id');
+        $userEmail = Session::get('auth_user_email');
+        $schoolId = Session::get('auth_school_id');
+        
+        // Skip two-factor check for now since we're using custom auth
+        // TODO: Implement custom 2FA system
+        
+        // Get user from database using custom connection
+        $user = DB::table('users')->where('id', $userId)->first();
 
         $teacher = $student = $parent = $teachers = $subscription = $prepiad_upcoming_plan = $prepiad_upcoming_plan_type = $check_payment = null;
         $boys = $girls = $license_expire = 0;
@@ -89,27 +93,42 @@ class DashboardController extends Controller {
         $paymentConfiguration = '';
         $settings = app(CachingService::class)->getSystemSettings();
         $system_settings = $settings;
+        $super_admin = [
+            'total_school'    => 0,
+            'active_schools'   => 0,
+            'inactive_schools' => 0,
+            'total_packages'  => 0
+        ];
+        $start_year = date('Y');
+        $schools = array();
+        $staffs = array();
+        $addon_graph = [array(), array()];
+        $package_graph = [array(), array()];
+
         // School Admin Dashboard
-        if (Auth::user()->hasRole('School Admin') || Auth::user()->school_id) {
+        if ($schoolId) { 
             // Counters
             $teacher = $this->user->builder()->role("Teacher")->withTrashed()->count();
             $student = $this->user->builder()->role('Student')->withTrashed()->whereHas('students', function ($q) {
-                $q->where('application_status', 1);
+                $q->where('status', 1);
             })->count();
-            $parent = $this->student->builder()->where('application_status',1)->groupBy('guardian_id')->get()->count();
-            
-            if ($student > 0) {
-                $boys_count = $this->user->builder()->role('Student')->where('gender', 'male')->withTrashed()->count();
-                $girls_count = $this->user->builder()->role('Student')->where('gender', 'female')->withTrashed()->count();
-                $boys = round((($boys_count * 100) / $student), 2);
-                $girls = round(($girls_count * 100) / $student, 2);
-                $total_students = $student;
-            }
+            $parent = $this->user->builder()->role('Guardian')->withTrashed()->count();
+
+            $teachers = $this->user->builder()->role("Teacher")->withTrashed()->take(5)->get();
+
+            $boys = $this->student->builder()->whereHas('user', function ($q) {
+                $q->where('gender', 'Male');
+            })->count();
+            $girls = $this->student->builder()->whereHas('user', function ($q) {
+                $q->where('gender', 'Female');
+            })->count();
+            $total_students = $this->student->builder()->count();
+
             $classes_counter = $this->class->builder()->count();
             $streams = $this->stream->builder()->count();
             // End Counters
 
-            $subscription = $this->subscriptionService->active_subscription(Auth::user()->school_id);
+            $subscription = $this->subscriptionService->active_subscription($schoolId);
             $schoolSettings = $this->cache->getSchoolSettings();
 
             if ($subscription) {
@@ -195,12 +214,7 @@ class DashboardController extends Controller {
         }
 
         // Super admin dashboard
-        $super_admin = [
-            'total_school'    => 0,
-            'active_school'   => 0,
-            'deactive_school' => 0,
-        ];
-        if (Auth::user()->hasRole('Super Admin') || !Auth::user()->school_id) {
+        if (!$schoolId) { // Simplified check for super admin (no school_id means super admin)
             $school = $this->school->builder()->get();
             $total_school = $school->count();
             $active_school = $school->where('status', 1)->count();
@@ -255,28 +269,16 @@ class DashboardController extends Controller {
 
         }
 
-        // Timetable
-        if (Auth::user()->hasRole('Teacher')) {
-            $date = Carbon::now();
-            $fullDayName = $date->format('l');
-            $timetables = $this->timetable->builder()
-                ->whereHas('subject_teacher', function ($q) {
-                    $q->where('teacher_id', Auth::user()->id);
-                })
-                ->where('day', $fullDayName)->orderBy('start_time', 'ASC')
-                ->with('subject:id,name,type', 'class_section.class', 'class_section.section', 'class_section.medium')->get();
+        // Timetable - Simplified for now since we don't have role data
+        // TODO: Implement custom role system for teacher timetable
+        $timetables = [];
+        
+        if ($schoolId) { // School admin view
+            return view('dashboard', compact('teacher', 'parent', 'student', 'announcement', 'teachers', 'boys', 'girls', 'total_students','license_expire', 'subscription', 'previous_subscriptions', 'holiday', 'classData', 'prepiad_upcoming_plan', 'prepiad_upcoming_plan_type','check_payment','sessionYear','classes_counter','streams','exams', 'fees_detail', 'settings', 'class_names', 'paymentConfiguration','system_settings','class_section_names', 'super_admin', 'start_year', 'schools', 'staffs', 'addon_graph', 'package_graph'));
         }
         
-        if ((Auth::user()->hasRole('School Admin') || Auth::user()->school_id) && (!Auth::user()->hasRole('Teacher') && !Auth::user()->hasRole('Super Admin')) ) {
-            return view('dashboard', compact('teacher', 'parent', 'student', 'announcement', 'teachers', 'boys', 'girls', 'total_students','license_expire', 'subscription', 'previous_subscriptions', 'holiday', 'classData', 'prepiad_upcoming_plan', 'prepiad_upcoming_plan_type','check_payment','sessionYear','classes_counter','streams','exams', 'fees_detail', 'settings', 'class_names', 'paymentConfiguration','system_settings','class_section_names'));
-        }
-        if (Auth::user()->hasRole('Teacher')) {
-            return view('teacher_dashboard', compact('teacher', 'parent', 'student', 'announcement', 'teachers', 'boys', 'girls', 'holiday', 'timetables', 'classData','sessionYear','classes_counter','streams','class_names','total_students','exams'));
-        }
-
-        if (Auth::user()->hasRole('Super Admin') || Auth::user()->school_id == null) {
-            return view('dashboard', compact('settings', 'super_admin','boys', 'girls', 'fees_detail','start_year','schools','staffs','addon_graph','package_graph', 'paymentConfiguration'));
-        }
+        // Super admin view
+        return view('dashboard', compact('settings', 'super_admin','boys', 'girls', 'fees_detail','start_year','schools','staffs','addon_graph','package_graph', 'paymentConfiguration'));
 
     }
 

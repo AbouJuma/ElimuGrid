@@ -41,18 +41,18 @@ class Kernel extends HttpKernel {
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \App\Http\Middleware\SharedHostingTenantMiddleware::class,
             DemoMiddleware::class,
             LanguageManager::class,
             \App\Http\Middleware\WizardSettings::class,
-            // \App\Http\Middleware\CustomAuth::class,
         ],
 
         'api' => [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            DemoMiddleware::class,
-            // \App\Http\Middleware\CheckChild::class,
+            \App\Http\Middleware\DemoMiddleware::class,
+            \App\Http\Middleware\SharedHostingTenantMiddleware::class,
         ],
     ];
 
@@ -89,5 +89,8 @@ class Kernel extends HttpKernel {
         '2fa' => \App\Http\Middleware\CheckTwoFactorAuthenticated::class,
         'wizardSettings' => \App\Http\Middleware\WizardSettings::class,
         'feature_check' => \App\Http\Middleware\FeatureCheck::class,
+        'customAuth' => \App\Http\Middleware\CustomAuth::class,
+        'custom_auth' => \App\Http\Middleware\CustomAuth::class,
+        'tenant' => \App\Http\Middleware\SharedHostingTenantMiddleware::class,
     ];
 }

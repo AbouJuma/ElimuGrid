@@ -49,7 +49,7 @@ class PromoteStudentController extends Controller {
             'promote_data' => 'required'
         ], ['promote_data.required' => "No Student Data Found"]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $promoteStudentData = array();
             foreach ($request->promote_data as $key => $data) {
@@ -118,11 +118,11 @@ class PromoteStudentController extends Controller {
                 $this->user->builder()->whereIn('id', $leftStudentSIds)->update(['status' => 0,'deleted_at' => now()]);
             }
             $this->promoteStudent->upsert($promoteStudentData, ['class_section', 'student_id', 'session_year_id'], ['status', 'result']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
 
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -221,7 +221,7 @@ class PromoteStudentController extends Controller {
             'student_ids' => 'required'
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // $studentIds = json_decode($request->student_ids);
             $studentIds = explode(",",$request->student_ids);
             $roll_number_db = $this->student->builder()->select(DB::raw('max(roll_number)'))->where('class_section_id', $request->new_class_section_id)->first();
@@ -247,10 +247,10 @@ class PromoteStudentController extends Controller {
             }
 
             $this->student->upsert($updateStudent,['id'],['class_section_id','roll_number']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

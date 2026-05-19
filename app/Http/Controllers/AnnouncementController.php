@@ -78,7 +78,7 @@ class AnnouncementController extends Controller {
             ]),
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear(); // Get Current Session Year
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
             // Custom Announcement Array to Store Data
@@ -201,23 +201,34 @@ class AnnouncementController extends Controller {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Announcement', $announcement->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            if ($notifyUser !== null && !empty($title)) {
+            if (isset($notifyUser) && $notifyUser !== null && !empty($title)) {
                 $type = 'Class Section'; // Get The Type for Notification
                 $body = $request->title; // Get The Body for Notification
-                send_notification($notifyUser->toArray(), $title, $body, $type); // Send Notification
+                // Send push notification using user IDs
+                send_notification($notifyUser->toArray(), $title, $body, $type);
+                // Record notification in DB for audit and visibility in notification list
+                $notification = \App\Models\Notification::create([
+                    'title' => $title,
+                    'message' => $body,
+                    'send_to' => 'Student', // label as Student since it's an announcement to them
+                    'session_year_id' => $sessionYear->id,
+                    'school_id' => auth()->user()->school_id ?? null,
+                ]);
+                // Add tracking entry so it appears in the notifications list
+                $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Notification', $notification->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             $notificationStatus = app(GeneralFunctionService::class)->wrongNotificationSetup($e);
             if ($notificationStatus) {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Announcement Controller -> Store Method");
                 ResponseService::errorResponse();
             } else {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             }
             
@@ -242,7 +253,7 @@ class AnnouncementController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear(); // Get Current Session Year
 
             // Custom Announcement Array to Store Data
@@ -374,16 +385,16 @@ class AnnouncementController extends Controller {
                 // send_notification($notifyUser, $title, $body, $type); // Send Notification
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             $notificationStatus = app(GeneralFunctionService::class)->wrongNotificationSetup($e);
             if ($notificationStatus) {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Announcement Controller -> Update Method");
                 ResponseService::errorResponse();
             } else {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             }
             
@@ -391,10 +402,10 @@ class AnnouncementController extends Controller {
             // if (Str::contains($e->getMessage(), [
             //         'does not exist','file_get_contents'
             //     ])) {
-            //     DB::commit();
+            //     DB::connection('mysql')->commit();
             //     ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             // } else {
-            //     DB::rollBack();
+            //     DB::connection('mysql')->rollBack();
             //     ResponseService::logErrorResponse($e, "Announcement Controller -> Update Method");
             //     ResponseService::errorResponse();
             // }
@@ -489,7 +500,7 @@ class AnnouncementController extends Controller {
         ResponseService::noFeatureThenRedirect('Announcement Management');
         ResponseService::noPermissionThenSendJson('announcement-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->announcement->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $semester = $this->cache->getDefaultSemesterData();
@@ -498,10 +509,10 @@ class AnnouncementController extends Controller {
             } else {
                 $this->sessionYearsTrackingsService->deleteSessionYearsTracking('App\Models\Announcement', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Announcement Controller -> Destroy Method");
             ResponseService::errorResponse();
         }
@@ -511,7 +522,7 @@ class AnnouncementController extends Controller {
         ResponseService::noFeatureThenRedirect('Announcement Management');
         ResponseService::noPermissionThenRedirect('announcement-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Find the Data by FindByID
             $file = $this->files->findById($id);
@@ -519,10 +530,10 @@ class AnnouncementController extends Controller {
             // Delete the file data
             $file->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Announcement Controller -> fileDelete Method");
             ResponseService::errorResponse();
         }

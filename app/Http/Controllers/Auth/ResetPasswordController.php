@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\User;
+use App\Services\SharedHostingTenantService;
 use App\Providers\RouteServiceProvider;
 use Auth;
 use Illuminate\Foundation\Auth\ResetsPasswords;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 
@@ -40,10 +40,7 @@ class ResetPasswordController extends Controller
         if ($request->school_code) {
             $school = School::where('code',$request->school_code)->first();
             if ($school) {
-                DB::setDefaultConnection('school');
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
             }
         }

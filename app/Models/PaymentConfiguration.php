@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Traits\TenantModel;
 
 class PaymentConfiguration extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = [
         'payment_method',
         'api_key',

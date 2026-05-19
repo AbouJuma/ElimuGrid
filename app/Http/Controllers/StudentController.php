@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -114,7 +115,7 @@ class StudentController extends Controller {
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check free trial package
             $today_date = Carbon::now()->format('Y-m-d');
@@ -125,7 +126,7 @@ class StudentController extends Controller {
             // If free trail package
             if ($subscription) {
                 $systemSettings = $this->cache->getSystemSettings();
-                $student = $this->user->builder()->role('Student')->withTrashed()->count();
+                $student = $this->user->builder()->role('Student')->where('school_id', Auth::user()->school_id)->withTrashed()->count();
                 if ($student >= $systemSettings['student_limit']) {
                     $message = "The free trial allows only " . $systemSettings['student_limit'] . " students.";
                     ResponseService::errorResponse($message);
@@ -156,7 +157,7 @@ class StudentController extends Controller {
             $is_send_notification = true;
             $userService->createStudentUser($request->first_name, $request->last_name, $request->admission_no, $request->mobile, $request->dob, $request->gender, $request->image, $request->class_section_id, $request->admission_date, $request->current_address, $request->permanent_address, $sessionYear->id, $guardian->id, $request->extra_fields ?? [], $request->status ?? 0, $is_send_notification);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             // IF Exception is TypeError and message contains Mail keywords then email is not sent successfully
@@ -166,12 +167,17 @@ class StudentController extends Controller {
                     'Mailer',
                     'MailManager'
                 ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Student Registered successfully. But Email not sent.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
+                Log::error("Student Registration Failed: " . $e->getMessage(), [
+                    'exception' => $e,
+                    'request' => $request->all(),
+                    'trace' => $e->getTraceAsString()
+                ]);
                 ResponseService::logErrorResponse($e, "Student Controller -> Store method");
-                ResponseService::errorResponse();
+                ResponseService::errorResponse('Error Occurred', null, null, $e);
             }
 
         }
@@ -194,16 +200,16 @@ class StudentController extends Controller {
         $request->validate($rules);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $userService = app(UserService::class);
             $sessionYear = $this->sessionYear->findById($request->session_year_id);
             $guardian = $userService->createOrUpdateParent($request->guardian_first_name, $request->guardian_last_name, $request->guardian_email, $request->guardian_mobile, $request->guardian_gender, $request->guardian_image, $request->parent_reset_password);
 
             $userService->updateStudentUser($id, $request->first_name, $request->last_name, $request->mobile, $request->dob, $request->gender, $request->image, $sessionYear->id, $request->extra_fields ?? [], $guardian->id, $request->current_address, $request->permanent_address, $request->reset_password, $request->class_section_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Controller -> Update method");
             ResponseService::errorResponse();
         }
@@ -355,7 +361,7 @@ class StudentController extends Controller {
             $this->user->deleteById($user_id);
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Controller -> Delete method");
             ResponseService::errorResponse();
         }
@@ -365,7 +371,7 @@ class StudentController extends Controller {
         try {
             // ResponseService::noFeatureThenSendJson('Student Management');
             ResponseService::noPermissionThenRedirect('student-edit');
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $user = $this->user->findTrashedById($userId);
             if ($user->status == 0) {
                 $subscription = $this->subscriptionService->active_subscription(Auth::user()->school_id);
@@ -380,10 +386,10 @@ class StudentController extends Controller {
             }
                         
             $this->user->builder()->where('id', $userId)->withTrashed()->update(['status' => $user->status == 0 ? 1 : 0, 'deleted_at' => $user->status == 1 ? now() : null]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Student Controller ---> Change Status');
             ResponseService::errorResponse();
         }
@@ -393,7 +399,7 @@ class StudentController extends Controller {
         // ResponseService::noFeatureThenSendJson('Student Management');
         ResponseService::noPermissionThenRedirect('student-create');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             foreach (json_decode($request->ids, false, 512, JSON_THROW_ON_ERROR) as $key => $userId) {
                 $studentUser = $this->user->findTrashedById($userId);
                 if ($studentUser->status == 0) {
@@ -410,7 +416,7 @@ class StudentController extends Controller {
 
                 $this->user->builder()->where('id', $userId)->withTrashed()->update(['status' => $studentUser->status == 0 ? 1 : 0, 'deleted_at' => $studentUser->status == 1 ? now() : null]);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -422,7 +428,7 @@ class StudentController extends Controller {
         // ResponseService::noFeatureThenSendJson('Student Management');
         ResponseService::noPermissionThenSendJson('student-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             
             // Get student record with guardian
             $student = $this->student->builder()->with('guardian')->where('user_id', $id)->first();
@@ -441,10 +447,10 @@ class StudentController extends Controller {
             $this->student->builder()->where('user_id', $id)->withTrashed()->forceDelete();
             $this->user->builder()->where('id', $id)->withTrashed()->forceDelete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Permanently");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Controller ->Trash Method", 'cannot_delete_because_data_is_associated_with_other_data');
             ResponseService::errorResponse();
         }
@@ -477,7 +483,7 @@ class StudentController extends Controller {
                 'Mailer',
                 'MailManager'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Student Registered successfully. But Email not sent.");
             } else {
                 ResponseService::errorResponse($e->getMessage());
@@ -535,15 +541,15 @@ class StudentController extends Controller {
     public function resetPasswordUpdate(Request $request) {
         ResponseService::noPermissionThenRedirect('student-change-password');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $dob = date('dmY', strtotime($request->dob));
             $password = Hash::make($dob);
             $this->user->update($request->id, ['password' => $password, 'reset_request' => 0]);
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Controller -> Reset Password method");
             ResponseService::errorResponse();
         }
@@ -567,7 +573,7 @@ class StudentController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             foreach ($request->roll_number_data as $data) {
                 $updateRollNumberData = array(
                     'roll_number' => $data['roll_number']
@@ -586,10 +592,10 @@ class StudentController extends Controller {
                 // TODO : Use upsert here
                 $this->student->update($data['student_id'], $updateRollNumberData);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Controller -> updateStudentRollNumber");
             ResponseService::errorResponse();
         }
@@ -1006,7 +1012,7 @@ class StudentController extends Controller {
         ]);
         try {
             $userService = app(UserService::class);
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             foreach (json_decode($request->ids, false, 512, JSON_THROW_ON_ERROR) as $key => $userId) {
                 $user = $this->user->findTrashedById($userId);
                 $student = $this->student->builder()->where('user_id', $userId)->first();
@@ -1038,7 +1044,7 @@ class StudentController extends Controller {
                     
                 }
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -1059,7 +1065,7 @@ class StudentController extends Controller {
         try {
           
             $userService = app(UserService::class);
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             
             $user = $this->user->findTrashedById($request->edit_user_id);
             $student = $this->student->builder()->where('user_id', $request->edit_user_id)->first();
@@ -1090,7 +1096,7 @@ class StudentController extends Controller {
              
                 
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);

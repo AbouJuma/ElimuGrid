@@ -131,7 +131,7 @@ class RoleController extends Controller {
             if (in_array($request->name, $this->reserveRole)) {
                 return redirect()->back()->with('error', $request->name . " " . trans("is not a valid Role name Because it's Reserved Role"));
             }
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $role = Role::create(['name' => $request->input('name'), 'school_id' => Auth::user()->school_id]);
             $role->syncPermissions($request->input('permission'));
 
@@ -140,10 +140,10 @@ class RoleController extends Controller {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Role', $role->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             return redirect()->route('roles.index')->with('success', trans('Data Stored Successfully'));
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -183,7 +183,7 @@ class RoleController extends Controller {
         ResponseService::noFeatureThenRedirect('Staff Management');
         ResponseService::noPermissionThenRedirect('role-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $validator = Validator::make($request->all(), [
                 'name' => 'required',
                 'permission' => 'required'
@@ -203,10 +203,10 @@ class RoleController extends Controller {
             $role->save();
 
             $role->syncPermissions($request->input('permission'));
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -232,7 +232,7 @@ class RoleController extends Controller {
             
             
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

@@ -568,33 +568,83 @@ $(".timetable-settings-form").validate({
     }
 });
 
-$(".school-registration-validate").validate({
-    rules: {
-        'school_image': {
-            extension: "jpg|jpeg|png|svg"
-        },
-        admin_image: {
-            extension: "jpg|jpeg|png|svg"
-        }
-    },
-    messages: {
-        school_image: {
-            extension: "Please upload file in these format only (jpg, jpeg, png, svg)."
-        },
-        admin_image: {
-            extension: "Please upload file in these format only (jpg, jpeg, png, svg)."
-        }
-    },
-    success: function (label, element) {
-        success(element);
-    },
-    errorPlacement: function (label, element) {
-        errorPlacement(label, element);
-    },
-    highlight: function (element, errorClass) {
-        highlight(element, errorClass);
-    }
-});
+// $(".school-registration-validate").validate({
+//     rules: {
+//         'school_name': {
+//             required: true
+//         },
+//         'school_support_email': {
+//             required: true,
+//             email: true
+//         },
+//         'school_support_phone': {
+//             required: true,
+//             number: true,
+//             minlength: 1,
+//             maxlength: 16
+//         },
+//         'school_tagline': {
+//             required: true
+//         },
+//         'school_address': {
+//             required: true
+//         },
+//         'school_code_prefix': {
+//             required: true
+//         },
+//         'domain_type': {
+//             required: true
+//         },
+//         'school_image': {
+//             extension: "jpg|jpeg|png|svg"
+//         },
+//         admin_image: {
+//             extension: "jpg|jpeg|png|svg"
+//         }
+//     },
+//     messages: {
+//         school_name: {
+//             required: "School name is required."
+//         },
+//         'school_support_email': {
+//             required: "Support email is required.",
+//             email: "Please enter a valid email address."
+//         },
+//         'school_support_phone': {
+//             required: "Support phone is required.",
+//             number: "Please enter a valid phone number.",
+//             minlength: "Phone number must be at least 1 digit.",
+//             maxlength: "Phone number cannot exceed 16 digits."
+//         },
+//         'school_tagline': {
+//             required: "Tagline is required."
+//         },
+//         'school_address': {
+//             required: "Address is required."
+//         },
+//         'school_code_prefix': {
+//             required: "School code prefix is required."
+//         },
+//         'domain_type': {
+//             required: "Domain type is required."
+//         },
+//         'school_image': {
+//             extension: "Please upload file in these format only (jpg, jpeg, png, svg)."
+//         },
+//         'admin_image': {
+//             extension: "Please upload file in these format only (jpg, jpeg, png)."
+//         }
+//     },
+//     success: function (label, element) {
+//         success(element);
+//     },
+//     errorPlacement: function (label, element) {
+//         errorPlacement(label, element);
+//     },
+//     highlight: function (element, errorClass) {
+//         highlight(element, errorClass);
+//     }
+// });
 
 
 $(".change-school-admin").validate({

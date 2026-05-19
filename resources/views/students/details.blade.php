@@ -656,7 +656,7 @@
         }
 
         // Student Events Handler for ID Card Preview
-        window.studentEvents = {
+        window.studentEvents = $.extend({}, window.studentEvents, {
             'click .preview-id-card': function (e, value, row, index) {
                 e.preventDefault();
                 var studentName = $(e.currentTarget).data('student-name');
@@ -671,7 +671,7 @@
                 generateBarcodeForModal(grNumber);
                 $('#idCardPreviewModal').modal('show');
             }
-        };
+        });
 
         // Print ID Card from Modal
         function printModalIdCard() {

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantModel;
 
 class Message extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['chat_id','sender_id','message','read_at'];
 
 

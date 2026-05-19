@@ -62,12 +62,22 @@ class BookController extends Controller
         }
 
         $books = $query->get();
+        $index = 1;
 
         return response()->json([
             'total' => $books->count(),
-            'rows' => $books->map(function ($book) {
+            'rows' => $books->map(function ($book) use (&$index) {
+                $operate = '';
+                if (Auth::user()->can('book-edit')) {
+                    $operate .= BootstrapTableService::button('fa fa-edit', '#', ['edit-btn', 'btn-gradient-primary'], ['title' => __('Edit'), 'data-id' => $book->id]);
+                }
+                if (Auth::user()->can('book-delete')) {
+                    $operate .= BootstrapTableService::deleteButton(route('library.books.destroy', $book->id));
+                }
+
                 return [
                     'id' => $book->id,
+                    'no' => $index++,
                     'title' => $book->title,
                     'author' => $book->author,
                     'isbn' => $book->isbn,
@@ -76,6 +86,7 @@ class BookController extends Controller
                     'available_quantity' => $book->available_quantity,
                     'issued_quantity' => $book->issued_quantity,
                     'status' => $book->isAvailable() ? 'Available' : 'Out of Stock',
+                    'operate' => $operate,
                 ];
             })
         ]);
@@ -92,7 +103,7 @@ class BookController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'author' => 'required|string|max:255',
-            'isbn' => 'nullable|string|unique:books,isbn',
+            'isbn' => 'nullable|string|unique:' . (new \App\Models\Book)->getTable() . ',isbn',
             'category' => 'nullable|string|max:100',
             'quantity' => 'required|integer|min:0',
         ]);
@@ -107,7 +118,7 @@ class BookController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $data = [
                 'title' => $request->title,
@@ -120,10 +131,10 @@ class BookController extends Controller
 
             $this->book->create($data);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Book added successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::errorResponse('Failed to add book', null, null, $e);
         }
     }
@@ -151,7 +162,7 @@ class BookController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'author' => 'required|string|max:255',
-            'isbn' => 'required|string|unique:books,isbn,' . $id,
+            'isbn' => 'required|string|unique:' . (new \App\Models\Book)->getTable() . ',isbn,' . $id,
             'category' => 'nullable|string|max:100',
             'quantity' => 'required|integer|min:1',
         ]);
@@ -161,7 +172,7 @@ class BookController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $book = $this->book->findById($id);
             
@@ -186,10 +197,10 @@ class BookController extends Controller
 
             $this->book->update($id, $data);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Book updated successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::errorResponse('Failed to update book', null, null, $e);
         }
     }

@@ -10,9 +10,9 @@ use App\Models\OptionalFee;
 use App\Models\PaymentConfiguration;
 use App\Models\PaymentTransaction;
 use App\Models\School;
+use App\Services\SharedHostingTenantService;
 use App\Models\User;
 use App\Repositories\User\UserInterface;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
@@ -41,9 +41,7 @@ class WebhookController extends Controller {
             $school_id = $data->data->object->metadata->school_id;
             $school = School::on('mysql')->where('id',$school_id)->first();
 
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
 
             // You can find your endpoint's secret in your webhook settings
@@ -84,7 +82,7 @@ class WebhookController extends Controller {
                     }
                     $fees = Fee::where('id', $metadata['fees_id'])->with(['fees_class_type', 'fees_class_type.fees_type'])->firstOrFail();
 
-                    DB::beginTransaction();
+                    DB::connection('mysql')->beginTransaction();
                     try {
                         // Update payment transaction status
                         PaymentTransaction::find($metadata['payment_transaction_id'])->update(['payment_status' => "succeed"]);
@@ -193,16 +191,16 @@ class WebhookController extends Controller {
 
                     // Send success notification
                     \Log::info("Success Notification in Stripe");
-                    $user = User::where('id', $metadata['parent_id'])->first();
+                    $user = DB::connection('school')->table('users')->where('id', $metadata['parent_id'])->first(); // Use custom connection
                     \Log::info("User ID : ",[$user]);
                     $body = 'Amount :- ' . $paymentTransactionData->amount;
                     $type = 'payment';
                     send_notification([$user->id], 'Fees Payment Successful', $body, $type, ['is_payment_success'=> "true"]);
                         \Log::info("send_notification",[$user->id]);
-                    DB::commit();
+                    DB::connection('mysql')->commit();
                         Log::info("Payment processed successfully for transaction ID: " . $metadata['payment_transaction_id']);
                     } catch (\Exception $e) {
-                        DB::rollBack();
+                        DB::connection('mysql')->rollBack();
                         Log::error("Error processing payment: " . $e->getMessage());
                         throw $e;
                     }
@@ -228,7 +226,7 @@ class WebhookController extends Controller {
 
                     http_response_code(400);
                     \Log::info("Failed Notification in Stripe");
-                    $user = User::where('id', $metadata['parent_id'])->first();
+                    $user = DB::connection('school')->table('users')->where('id', $metadata['parent_id'])->first(); // Use custom connection
                     \Log::info("User ID : ",[$user]);
                     $body = 'Amount :- ' . $paymentTransactionData->amount;
                     $type = 'payment';
@@ -252,7 +250,7 @@ class WebhookController extends Controller {
             exit();
         } catch
         (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Stripe Webhook : Error occurred", [$e->getMessage() . ' --> ' . $e->getFile() . ' At Line : ' . $e->getLine()]);
             http_response_code(400);
             exit();
@@ -287,9 +285,7 @@ class WebhookController extends Controller {
             }
 
             // Switch to school database
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
 
             // Get payment configuration
@@ -369,9 +365,7 @@ class WebhookController extends Controller {
             $school = School::on('mysql')->where('id', $school_id)->first();
 
             // Set up database connection for the school
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
 
             // Get payment configuration
@@ -435,7 +429,7 @@ class WebhookController extends Controller {
                     ->with(['fees_class_type', 'fees_class_type.fees_type'])
                     ->firstOrFail();
 
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
                 // Update payment transaction status
                 PaymentTransaction::where('order_id', $data->data->reference)
                     ->update(['payment_status' => "succeed"]);
@@ -555,7 +549,7 @@ class WebhookController extends Controller {
                 $type = 'payment';
                 send_notification([$user->id], 'Fees Payment Successful', $body, $type, ['is_payment_success'=> "true"]);
                 \Log::info("send_notification",[$user->id]);
-                DB::commit();
+                DB::connection('mysql')->commit();
                 return response()->json(['status' => 'success'], 200);
 
             } else if ($data->event === 'charge.failed') {
@@ -566,7 +560,7 @@ class WebhookController extends Controller {
                     return response()->json(['error' => 'Transaction not found'], 404);
                 }
 
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
 
                 PaymentTransaction::find($metadata->payment_transaction_id)
                     ->update(['payment_status' => "failed"]);
@@ -589,7 +583,7 @@ class WebhookController extends Controller {
                     \Log::info("send_notification",[$user->id]);
                 }
 
-                DB::commit();
+                DB::connection('mysql')->commit();
                 return response()->json(['status' => 'failed'], 400);
             }
 
@@ -602,7 +596,7 @@ class WebhookController extends Controller {
             Log::error("Paystack Webhook : Invalid signature", [$e->getMessage()]);
             return response()->json(['error' => 'Invalid signature'], 400);
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Paystack Webhook Error: " . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine()
@@ -624,9 +618,7 @@ class WebhookController extends Controller {
             $school_id = $data->meta_data->school_id;
             $school = School::on('mysql')->where('id',$school_id)->first();
 
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
             
             // You can find your endpoint's secret in your webhook settings
@@ -662,7 +654,7 @@ class WebhookController extends Controller {
                 }
                 $fees = Fee::where('id', $data->meta_data->fees_id)->with(['fees_class_type', 'fees_class_type.fees_type'])->firstOrFail();
 
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
                 PaymentTransaction::where('id', $paymentTransactionData->id)->update(['payment_status' => "succeed"]);   
                 $feesPaidDB = FeesPaid::where([
                     'fees_id'    => $data->meta_data->fees_id,
@@ -771,7 +763,7 @@ class WebhookController extends Controller {
                 send_notification([$user->id], 'Fees Payment Successful', $body, $type, ['is_payment_success'=> 'true']);
                 \Log::info("send_notification",[$user->id]);
                 http_response_code(200);
-                DB::commit();
+                DB::connection('mysql')->commit();
                
             } elseif (isset($data->event) && $data->event == 'charge.failed') {
                 $paymentTransactionData = PaymentTransaction::find($data->data->id);
@@ -817,7 +809,7 @@ class WebhookController extends Controller {
             http_response_code(400);
             exit();
         } catch(Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Flutterwave Webhook : Error occurred", [$e->getMessage() . ' --> ' . $e->getFile() . ' At Line : ' . $e->getLine()]);
             http_response_code(400);
             exit();
@@ -832,7 +824,7 @@ class WebhookController extends Controller {
             return response()->json(['status' => 'success', 'message' => 'Transaction already processed']);
         }
 
-        DB::beginTransaction();
+        DB::connection('mysql')->beginTransaction();
         try {
             // Update payment transaction status
             $paymentTransaction->payment_status = "succeed";
@@ -880,24 +872,24 @@ class WebhookController extends Controller {
             }
 
             // Send success notification
-            $user = User::find($metadata->parent_id);
+            $user = DB::connection('school')->table('users')->where('id', $metadata['parent_id'])->first(); // Use custom connection
             if ($user) {
                 $body = 'Amount: ' . $amount;
                 send_notification([$user->id], 'Fees Payment Successful', $body, 'payment', ['is_payment_success' => 'true']);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             return response()->json(['status' => 'success'], 200);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             throw $e;
         }
     }
 
     private function handleRazorpayFailed($paymentTransaction, $webhookData, $metadata)
     {
-        DB::beginTransaction();
+        DB::connection('mysql')->beginTransaction();
         try {
             $paymentTransaction->payment_status = "failed";
             $paymentTransaction->save();
@@ -911,17 +903,17 @@ class WebhookController extends Controller {
             }
 
             // Send failure notification
-            $user = User::find($metadata->parent_id);
+            $user = DB::connection('school')->table('users')->where('id', $metadata['parent_id'])->first(); // Use custom connection
             if ($user) {
                 $body = 'Amount: ' . ((int)$webhookData->amount / 100);
                 send_notification([$user->id], 'Fees Payment Failed', $body, 'payment', ['is_payment_success' => 'false']);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             return response()->json(['status' => 'failed'], 400);
 
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             throw $e;
         }
     }   

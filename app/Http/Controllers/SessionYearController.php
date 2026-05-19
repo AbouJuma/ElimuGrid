@@ -62,7 +62,7 @@ class SessionYearController extends Controller {
             $this->cache->removeSchoolCache(config("constants.CACHE.SCHOOL.SESSION_YEAR"));
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Session Year Controller -> Update method");
             ResponseService::errorResponse();
         }
@@ -130,7 +130,7 @@ class SessionYearController extends Controller {
     public function destroy($id) {
         ResponseService::noPermissionThenSendJson('session-year-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $year = $this->sessionYear->findById($id);
             if ($year->default == 1) {
                 $response = array(
@@ -139,11 +139,11 @@ class SessionYearController extends Controller {
                 );
             } else {
                 $this->sessionYear->deleteById($id);
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse('Data Deleted Successfully');
             }
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Session Year Controller -> Delete method");
             ResponseService::errorResponse();
         }
@@ -175,7 +175,7 @@ class SessionYearController extends Controller {
     public function default($id) {
         ResponseService::noPermissionThenRedirect('session-year-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $defaultSessionYear = $this->cache->getDefaultSessionYear();
             $this->chat->builder()->whereDate('created_at','<=',$defaultSessionYear->end_date)->delete();
             
@@ -191,10 +191,10 @@ class SessionYearController extends Controller {
             ];
             $this->schoolSettings->upsert($data, ["name"], ["data"]);
             $this->cache->removeSchoolCache(config("constants.CACHE.SCHOOL.SESSION_YEAR"));
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Default Session has been Changed SuccessFully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

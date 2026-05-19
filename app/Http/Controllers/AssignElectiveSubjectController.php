@@ -114,7 +114,7 @@ class AssignElectiveSubjectController extends Controller {
             $student_ids = explode(",", $request->student_ids);
             $school_id = Auth::user()->school_id;
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             try {
                 $successCount = 0;
                 $duplicateCount = 0;
@@ -160,7 +160,7 @@ class AssignElectiveSubjectController extends Controller {
                     $successCount++;
                 }
                 
-                DB::commit();
+                DB::connection('mysql')->commit();
                 
                 // Prepare response message based on results
                 if ($successCount > 0 && $duplicateCount > 0) {
@@ -174,7 +174,7 @@ class AssignElectiveSubjectController extends Controller {
                 }
                 
             } catch (\Exception $e) {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 \Log::error('Failed to assign elective subjects', [
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
@@ -317,14 +317,14 @@ class AssignElectiveSubjectController extends Controller {
     public function status($id) {
         ResponseService::noAnyPermissionThenSendJson(['assign-elective-subject-create', 'assign-elective-subject-edit']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $addon = $this->addon->findById($id);
             $addon = ['status' => $addon->status == 1 ? 0 : 1];
             $this->addon->update($id, $addon);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'AssignElectiveSubjectController -> status method');
             ResponseService::errorResponse();
         }

@@ -89,7 +89,7 @@
                                 <th scope="col" data-field="available_quantity">{{ __('Available') }}</th>
                                 <th scope="col" data-field="issued_quantity">{{ __('Issued') }}</th>
                                 <th scope="col" data-field="status" data-formatter="statusFormatter">{{ __('Status') }}</th>
-                                <th scope="col" data-field="operate" data-escape="false">{{ __('Action') }}</th>
+                                <th scope="col" data-field="operate" data-escape="false" data-events="operateEvents">{{ __('Action') }}</th>
                             </tr>
                             </thead>
                         </table>

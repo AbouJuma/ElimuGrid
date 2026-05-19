@@ -47,7 +47,7 @@ class TransportAllocationController extends Controller
             $query = DB::connection('school')->table('transport_allocations as ta')
                 ->leftJoin('students as s', 'ta.student_id', '=', 's.id')
                 ->leftJoin('users as u', 's.user_id', '=', 'u.id')
-                ->leftJoin('class_schools as cs', 'ta.class_id', '=', 'cs.id')
+                ->leftJoin('classes as cs', 'ta.class_id', '=', 'cs.id')
                 ->leftJoin('transport_routes as tr', 'ta.route_id', '=', 'tr.id')
                 ->leftJoin('transport_stops as ts', 'ta.stop_id', '=', 'ts.id')
                 ->leftJoin('transport_fees as tf', 'ta.transport_fee_id', '=', 'tf.id')
@@ -144,7 +144,7 @@ class TransportAllocationController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check if student already has active allocation
             $existingAllocation = TransportAllocation::owner()
@@ -185,7 +185,7 @@ class TransportAllocationController extends Controller
                 $this->feeService->generateFeeForAllocation($allocation);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -193,7 +193,7 @@ class TransportAllocationController extends Controller
                 'data' => $allocation->load(['student.user', 'route', 'stop'])
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error('Store allocation error: ' . $e->getMessage());
             Log::error($e->getTraceAsString());
             return response()->json(['error' => 'Failed to allocate transport: ' . $e->getMessage()], 500);
@@ -220,7 +220,7 @@ class TransportAllocationController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $allocation = TransportAllocation::owner()->findOrFail($id);
             $oldRouteId = $allocation->route_id;
@@ -243,7 +243,7 @@ class TransportAllocationController extends Controller
                 'auto_charge' => $request->auto_charge ?? $allocation->auto_charge,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -251,7 +251,7 @@ class TransportAllocationController extends Controller
                 'data' => $allocation->load(['student.user', 'route', 'stop'])
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to update allocation: ' . $e->getMessage()], 500);
         }
     }
@@ -265,7 +265,7 @@ class TransportAllocationController extends Controller
         ResponseService::noPermissionThenRedirect('transport-allocation-edit');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $allocation = TransportAllocation::owner()->findOrFail($id);
 
@@ -277,14 +277,14 @@ class TransportAllocationController extends Controller
             // Stop future billing
             $this->feeService->stopBilling($allocation);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Transport allocation terminated successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to terminate allocation: ' . $e->getMessage()], 500);
         }
     }
@@ -298,7 +298,7 @@ class TransportAllocationController extends Controller
         ResponseService::noPermissionThenRedirect('transport-allocation-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $allocation = TransportAllocation::owner()->findOrFail($id);
 
@@ -309,14 +309,14 @@ class TransportAllocationController extends Controller
 
             $allocation->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Transport allocation deleted successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to delete allocation: ' . $e->getMessage()], 500);
         }
     }

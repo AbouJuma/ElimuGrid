@@ -82,7 +82,7 @@ class PackageController extends Controller
         $request['charges'] = $request->charges ?? 0;
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $packageData = [
                 ...$request->all(),
                 'highlight'                  => $request->highlight ?? 0,
@@ -99,10 +99,10 @@ class PackageController extends Controller
                 ];
             }
             $this->packageFeature->upsert($packageFeatures, ['package_id', 'feature_id'], ['package_id', 'feature_id']); // Store package features
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Store method');
             ResponseService::errorResponse();
         }
@@ -211,7 +211,7 @@ class PackageController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Instant effects features
             if ($request->instant_effects) {
@@ -278,12 +278,12 @@ class PackageController extends Controller
 
             // Delete package features
             $this->packageFeature->builder()->whereIn('feature_id', $package_features)->where('package_id', $id)->delete();
-            DB::commit();
+            DB::connection('mysql')->commit();
             // Package update will affect all the schools that is why Cache::flush is used here.
             Cache::flush();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Update method');
             ResponseService::errorResponse();
         }
@@ -294,13 +294,13 @@ class PackageController extends Controller
         //
         ResponseService::noPermissionThenSendJson('package-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->package->update($id, ['status' => 0]);
             $this->package->deleteById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Destroy method');
             ResponseService::errorResponse();
         }
@@ -311,14 +311,14 @@ class PackageController extends Controller
     {
         ResponseService::noAnyPermissionThenSendJson(['package-create', 'package-edit']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $package = $this->package->findById($id);
             $package_status = ['status' => $package->status == 1 ? 0 : 1];
             $this->package->update($id, $package_status);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> change status method');
             ResponseService::errorResponse();
         }
@@ -330,12 +330,12 @@ class PackageController extends Controller
         ResponseService::noPermissionThenSendJson('package-edit');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->package->restoreById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Restored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Restore method');
             ResponseService::errorResponse();
         }
@@ -346,7 +346,7 @@ class PackageController extends Controller
     {
         ResponseService::noPermissionThenSendJson('package-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // TODO:: Add condition this package cannot be subscribed to any school.
             $package = $this->package->findOnlyTrashedById($id);
             if (count($package->subscription)) {
@@ -356,10 +356,10 @@ class PackageController extends Controller
             }
 
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Trash method');
             ResponseService::errorResponse();
         }
@@ -378,7 +378,7 @@ class PackageController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $ids = json_decode($request->ids, false, 512, JSON_THROW_ON_ERROR);
             $update = [];
             foreach ($ids as $key => $id) {
@@ -388,10 +388,10 @@ class PackageController extends Controller
                 ];
             }
             $this->package->upsert($update, ['id'], ['rank']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Rank Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller -> Change Rank method');
             ResponseService::errorResponse();
         }
@@ -475,7 +475,7 @@ class PackageController extends Controller
     {
         ResponseService::noAnyPermissionThenRedirect(['package-edit', 'package-create']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $update = [];
             foreach ($request->feature_id as $key => $value) {
 
@@ -486,10 +486,10 @@ class PackageController extends Controller
             }
 
             $this->feature->upsert($update, ['id'], ['status']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'Package Controller ->Enable Features method');
             ResponseService::errorResponse();
         }

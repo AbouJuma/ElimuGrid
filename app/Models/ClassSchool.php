@@ -9,8 +9,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
+
 class ClassSchool extends Model {
-    use SoftDeletes;
+    use SoftDeletes, TenantModel;
     use HasFactory;
 
     protected $table = 'classes';
@@ -46,7 +49,8 @@ class ClassSchool extends Model {
     }
 
     public function core_subjects() {
-        return $this->belongsToMany(Subject::class, ClassSubject::class, 'class_id', 'subject_id')->wherePivot('type', 'Compulsory')->withPivot('id as class_subject_id', 'semester_id')->where('class_subjects.deleted_at',null)->withTrashed();
+        $classSubject = new ClassSubject();
+        return $this->belongsToMany(Subject::class, ClassSubject::class, 'class_id', 'subject_id')->wherePivot('type', 'Compulsory')->withPivot('id as class_subject_id', 'semester_id')->where($classSubject->getTable() . '.deleted_at',null)->withTrashed();
     }
 
     public function elective_subjects() {

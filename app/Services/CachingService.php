@@ -14,6 +14,28 @@ use stdClass;
 class CachingService {
 
     /**
+     * School id for cache + settings: explicit argument, authenticated user, or custom school-code session.
+     */
+    public static function resolveEffectiveSchoolId($schoolId = null): ?int
+    {
+        if ($schoolId !== null && $schoolId !== '') {
+            return (int) $schoolId;
+        }
+
+        $authUser = Auth::user();
+        if ($authUser && $authUser->school_id !== null && $authUser->school_id !== '') {
+            return (int) $authUser->school_id;
+        }
+
+        $sessionSchoolId = session('auth_school_id');
+        if ($sessionSchoolId !== null && $sessionSchoolId !== '') {
+            return (int) $sessionSchoolId;
+        }
+
+        return null;
+    }
+
+    /**
      * @param $key
      * @param callable $callback - Callback function must return a value
      * @param int $time = 3600
@@ -74,11 +96,12 @@ class CachingService {
      * @return mixed
      */
     public function schoolLevelCaching($key, callable $callback, $schoolId = null, int $time = 900) {
-        if($schoolId){
-            $key .= "_" . $schoolId;
-        }else{
-            $key .= "_" . Auth::user()->school_id;
+        $resolved = self::resolveEffectiveSchoolId($schoolId);
+        if ($resolved === null) {
+            return $callback();
         }
+
+        $key .= '_' . $resolved;
 
         return Cache::remember($key, $time, $callback);
     }
@@ -90,10 +113,20 @@ class CachingService {
      */
     public function getSchoolSettings(array|string $key = '*', $schoolID = null) {
         $schoolSettings = app(SchoolSettingInterface::class);
-        $schoolID = (!empty($schoolID)) ? $schoolID : Auth::user()->school_id;
+        $schoolID = self::resolveEffectiveSchoolId($schoolID);
+        if ($schoolID === null) {
+            if (is_array($key)) {
+                return new stdClass();
+            }
+            if (is_string($key) && $key !== '*') {
+                return '';
+            }
+
+            return collect();
+        }
         $settings = $this->schoolLevelCaching(config('constants.CACHE.SCHOOL.SETTINGS'), function () use ($schoolSettings, $schoolID) {
             return $schoolSettings->builder()->where('school_id', $schoolID)->get()->pluck('data', 'name');
-        },$schoolID);
+        }, $schoolID);
         if (($key[0] != '*')) {
             /* There is a minor possibility of getting a specific key from the $systemSettings
              * So I have not fetched Specific key from DB. Otherwise, Specific key will be fetched here
@@ -122,11 +155,12 @@ class CachingService {
     }
 
     public function removeSchoolCache($key, $schoolID = null) {
-        if ($schoolID) {
-            $key .= "_" . $schoolID;
-        } else {
-            $key .= "_" . Auth::user()->school_id;
+        $resolved = self::resolveEffectiveSchoolId($schoolID);
+        if ($resolved === null) {
+            return;
         }
+
+        $key .= '_' . $resolved;
 
         Cache::forget($key);
     }
@@ -141,15 +175,27 @@ class CachingService {
      */
     public function getDefaultSessionYear($schoolId = null) {
         $sessionYear = app(SessionYearInterface::class);
-        return $this->schoolLevelCaching(config('constants.CACHE.SCHOOL.SESSION_YEAR'), function () use ($sessionYear, $schoolId) {
-            return $sessionYear->default($schoolId);
-        },$schoolId);
+        $resolved = self::resolveEffectiveSchoolId($schoolId);
+
+        $res = $this->schoolLevelCaching(config('constants.CACHE.SCHOOL.SESSION_YEAR'), function () use ($sessionYear, $resolved) {
+            return $sessionYear->default($resolved);
+        }, $resolved);
+
+        return empty($res) ? (object)[
+            'id' => null,
+            'name' => date('Y'),
+            'default' => 1,
+            'start_date' => date('Y-01-01'),
+            'end_date' => date('Y-12-31'),
+            'school_id' => $resolved,
+        ] : $res;
     }
     public function getDefaultSemesterData($schoolId = null) {
         $semester = app(SemesterInterface::class);
-        $timetable = $this->schoolLevelCaching(config('constants.CACHE.SCHOOL.SEMESTER'), function () use ($semester, $schoolId) {
-            return $semester->default($schoolId);
-        },$schoolId);
+        $resolved = self::resolveEffectiveSchoolId($schoolId);
+        $timetable = $this->schoolLevelCaching(config('constants.CACHE.SCHOOL.SEMESTER'), function () use ($semester, $resolved) {
+            return $semester->default($resolved);
+        }, $resolved);
 
         /*Added empty values so that wherever the code is used, we don't need to add isset over there*/
         return empty($timetable) ? (object)[

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Repositories\StudentSubject\StudentSubjectInterface;
 use App\Services\CachingService;
+use App\Traits\TenantModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\SessionYearsTracking;
 
 class Students extends Model {
-    use SoftDeletes;
+    use SoftDeletes, TenantModel;
     use HasFactory;
 
     protected $fillable = [

@@ -47,7 +47,7 @@ class AuthController extends Controller {
     }
 
     public function changePasswordStore(request $request) {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",
@@ -93,8 +93,18 @@ class AuthController extends Controller {
 
     public function logout(Request $request) {
         session(['logout_time' => now()]);
+        
+        $schoolDatabase = Session::get('auth_school_database') ?? Session::get('school_database_name');
+        if ($schoolDatabase) {
+            \App\Services\SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($schoolDatabase);
+            \DB::setDefaultConnection('school');
+        }
+
         $user = Auth::user();
-        DB::table('users')->where('email',$user->email)->update(['two_factor_secret' => null,'two_factor_expires_at' => null]);
+        if ($user) {
+            DB::table('users')->where('email',$user->email)->update(['two_factor_secret' => null,'two_factor_expires_at' => null]);
+        }
+        
         Auth::logout();
         $request->session()->flush();
         $request->session()->regenerate();
@@ -109,7 +119,7 @@ class AuthController extends Controller {
     }
 
     public function profileUpdate(Request $request) {
-        if (env('DEMO_MODE')) {
+        if (config('app.demo_mode')) {
             return response()->json(array(
                 'error'   => true,
                 'message' => "This is not allowed in the Demo Version.",

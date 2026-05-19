@@ -173,6 +173,7 @@
         // Load sections and subjects when class changes
         $('#class_id').on('change', function() {
             var classId = $(this).val();
+            console.log('Class changed to:', classId);
 
             if (classId) {
                 // Load sections
@@ -181,12 +182,17 @@
                     type: 'GET',
                     data: { class_id: classId },
                     success: function(data) {
+                        console.log('Loaded sections successfully:', data);
                         var currentSection = $('#section_id').val();
                         $('#section_id').empty().append('<option value="">Select Section (Optional)</option>');
                         $.each(data, function(key, section) {
                             var selected = (currentSection == section.id) ? 'selected' : '';
                             $('#section_id').append('<option value="' + section.id + '" ' + selected + '>' + section.name + '</option>');
                         });
+                        $('#section_id').trigger('change');
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Failed to load sections:', status, error, xhr.responseText);
                     }
                 });
 
@@ -196,12 +202,17 @@
                     type: 'GET',
                     data: { class_id: classId },
                     success: function(data) {
+                        console.log('Loaded subjects successfully:', data);
                         var currentSubject = $('#subject_id').val();
                         $('#subject_id').empty().append('<option value="">Select Subject</option>');
                         $.each(data, function(key, subject) {
                             var selected = (currentSubject == subject.id) ? 'selected' : '';
                             $('#subject_id').append('<option value="' + subject.id + '" ' + selected + '>' + subject.name + '</option>');
                         });
+                        $('#subject_id').trigger('change');
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Failed to load subjects:', status, error, xhr.responseText);
                     }
                 });
             }

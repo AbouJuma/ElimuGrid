@@ -14,7 +14,15 @@ return [
     | Supported: "gd", "imagick"
     |
     */
-
-    'driver' => 'gd'
+    'driver' => 'gd', // Force GD driver to avoid imagick issues
+    // Disable intervention auto-orientation to prevent network calls
+    'auto_orientation' => false,
+    // Disable intervention auto-optimization to prevent network calls  
+    'auto_optimize' => false,
+    // Configure GD to use less memory
+    'gd' => [
+        'jpeg_quality' => 75,
+        'png_compression_level' => 6
+    ]
 
 ];

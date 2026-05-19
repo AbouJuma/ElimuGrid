@@ -95,7 +95,7 @@ class LeaveController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             
             $data = [
                 'user_id' => Auth::user()->id,
@@ -152,16 +152,16 @@ class LeaveController extends Controller
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Leave', $leave->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Leave Controller -> Store Method");
                 ResponseService::errorResponse();
             }
@@ -269,17 +269,17 @@ class LeaveController extends Controller
             'to_date' => 'required|after_or_equal:from_date',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [
                 'reason' => $request->reason,
                 'from_date' => date('Y-m-d', strtotime($request->from_date)),
                 'to_date' => date('Y-m-d', strtotime($request->to_date)),
             ];
             $this->leave->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Leave Controller -> Update Method");
             ResponseService::errorResponse();
         }
@@ -290,7 +290,7 @@ class LeaveController extends Controller
         ResponseService::noFeatureThenRedirect('Staff Leave Management');
         ResponseService::noAnyPermissionThenRedirect(['leave-delete', 'approve-leave']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // $this->leave->deleteById($id);
             $leave = $this->leave->findById($id);
             foreach ($leave->file as $key => $file) {
@@ -307,10 +307,10 @@ class LeaveController extends Controller
             } else {
                 $this->sessionYearsTrackingsService->deleteSessionYearsTracking('App\Models\Leave', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Leave Controller -> Destroy Method");
             ResponseService::errorResponse();
         }
@@ -433,7 +433,7 @@ class LeaveController extends Controller
         ResponseService::noFeatureThenRedirect('Staff Leave Management');
         ResponseService::noPermissionThenRedirect('approve-leave');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $leave = $this->leave->update($request->id, ['status' => $request->status]);
             $user[] = $leave->user_id;
 
@@ -450,16 +450,16 @@ class LeaveController extends Controller
             }
 
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Leave Controller -> Leave Status Method");
                 ResponseService::errorResponse();
             }
@@ -470,7 +470,7 @@ class LeaveController extends Controller
     {
         ResponseService::noFeatureThenSendJson('Staff Leave Management');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $leave = $this->leaveDetail->builder()->with('leave:id,user_id', 'leave.user:id,first_name,last_name')
                 ->whereHas('leave', function ($q) {
                     $q->where('status', 1);
@@ -496,7 +496,7 @@ class LeaveController extends Controller
 
             return response()->json($response);
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Leave Controller -> Filter Leave Method");
             ResponseService::errorResponse();
         }

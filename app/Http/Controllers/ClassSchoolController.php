@@ -85,7 +85,7 @@ class ClassSchoolController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // $request->stream_id = $request->stream_id ?? [0];
             /* Create Class */
             if (!empty($request->stream_id) && $request->stream_id[0] != null) {
@@ -122,10 +122,10 @@ class ClassSchoolController extends Controller {
                 $this->classSection->createBulk($class_section);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -159,7 +159,7 @@ class ClassSchoolController extends Controller {
         }
         try {
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // Class Update
             $class = $this->class->findById($id, ['*'], ['class_sections']);
             $semesterIncluded = $request->include_semesters[0] ?? 0;
@@ -223,10 +223,10 @@ class ClassSchoolController extends Controller {
                 $q->where('class_id',$id);
             })->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -308,7 +308,7 @@ class ClassSchoolController extends Controller {
     public function destroy($id) {
         ResponseService::noPermissionThenSendJson('class-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $class = $this->class->findById($id, ['*'], ['class_sections']);
             if (!empty($class->class_sections)) {
                 foreach ($class->class_sections as $section) {
@@ -317,10 +317,10 @@ class ClassSchoolController extends Controller {
 
             }
             $this->class->deleteById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -384,7 +384,7 @@ class ClassSchoolController extends Controller {
         }
         try {
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // Subjects Update
 
             $coreSubjects = array();
@@ -433,10 +433,10 @@ class ClassSchoolController extends Controller {
             }
 
             $this->classSubject->upsert($classSubjects, ['class_id', 'subject_id', 'semester_id'], ['type','elective_subject_group_id']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -540,16 +540,16 @@ class ClassSchoolController extends Controller {
     public function deleteClassSubject($id) {
         // TODO : Set Permission
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $class_subject = $this->classSubject->findById($id);
             if ($class_subject->type == "Elective") {
                 $this->electiveSubjectGroup->findById($class_subject->elective_subject_group_id)->decrement('total_subjects');
             }
             $class_subject->delete();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "ClassSchool Controller ->deleteClassSubject Method", 'cannot_delete_because_data_is_associated_with_other_data');
             ResponseService::errorResponse();
         }

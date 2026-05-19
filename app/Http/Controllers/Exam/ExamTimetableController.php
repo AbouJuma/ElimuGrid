@@ -80,7 +80,7 @@ class ExamTimetableController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             foreach ($request->timetable as $timetable) {
                 $examTimetable = array(
@@ -105,10 +105,10 @@ class ExamTimetableController extends Controller {
             // Update Start Date and End Date to the particular Exam
             $exam = $this->exam->update($examID,['start_date' => $startDate,'end_date' => $endDate, 'last_result_submission_date' => $last_result_submission_date]);
           
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Timetable Controller -> Store method");
             ResponseService::errorResponse();
         }

@@ -22,18 +22,20 @@ class SystemUpdateController extends Controller {
     }
 
     public function index() {
-        if (!Auth::user()->hasRole('Super Admin')) {
+        // Check if user is authenticated via custom session
+        if (!Session::get('auth_user_id')) {
             $response = array(
                 'message' => trans('no_permission_message')
             );
-            return redirect(route('home'))->withErrors($response);
+            return redirect(route('login'))->withErrors($response);
         }
         $system_version = SystemSetting::where('name', 'system_version')->first();
         return view('system-update.index', compact('system_version'));
     }
 
     public function update(Request $request) {
-        if (!Auth::user()->hasRole('Super Admin')) {
+        // Check if user is authenticated via custom session
+        if (!Session::get('auth_user_id')) {
             $response = array(
                 'error'   => true,
                 'message' => trans('no_permission_message')

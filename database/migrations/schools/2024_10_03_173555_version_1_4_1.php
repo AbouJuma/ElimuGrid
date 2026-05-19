@@ -17,12 +17,14 @@ return new class extends Migration
         //
 
 
-        if (!Schema::connection('school')->hasColumn('form_fields', 'display_on_id')) {
-            // If the column doesn't exist, run the migration
-            Schema::table('form_fields', static function (Blueprint $table) {
-                $table->integer('display_on_id')->default(0)->comment('0 => No, 1 => Yes')->after('rank');
-            });
-        }
+        try {
+            if (!Schema::connection('school')->hasColumn('form_fields', 'display_on_id')) {
+                // If the column doesn't exist, run the migration
+                Schema::table('form_fields', static function (Blueprint $table) {
+                    $table->integer('display_on_id')->default(0)->comment('0 => No, 1 => Yes')->after('rank');
+                });
+            }
+        } catch (\Exception $e) {}
     }
 
     /**

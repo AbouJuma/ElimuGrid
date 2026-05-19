@@ -13,226 +13,287 @@ return new class extends Migration
      */
     public function up()
     {
-        //        set_time_limit(100);
+        $prefix = Schema::getConnection()->getConfig('prefix');
+        $dbName = DB::connection('mysql')->getDatabaseName();
+        $usersTable = $dbName . '.users';
+        $schoolsTable = 'schools';
+        $languagesTable = $dbName . '.languages';
 
 
         /************ Master Tables Started *******/
-        Schema::create('schools', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('address');
-            $table->string('support_phone');
-            $table->string('support_email');
-            $table->string('tagline');
-            $table->string('logo');
-            $table->foreignId('admin_id')->nullable()->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->tinyInteger('status')->default(0)->comment('0 => Deactivate, 1 => Active');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('schools')) {
+            Schema::create('schools', static function (Blueprint $table) use ($usersTable) {
+                $table->id();
+                $table->string('name');
+                $table->string('address');
+                $table->string('support_phone');
+                $table->string('support_email');
+                $table->string('tagline');
+                $table->string('logo');
+                $table->foreignId('admin_id')->nullable()->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->tinyInteger('status')->default(0)->comment('0 => Deactivate, 1 => Active');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::table('roles', static function (Blueprint $table) {
-            $table->foreignId('school_id')->nullable()->after('guard_name')->references('id')->on('schools')->onDelete('cascade');
-            $table->boolean('custom_role')->after('school_id')->default(1);
-            $table->boolean('editable')->after('custom_role')->default(1);
-            $table->dropUnique(['name', 'guard_name']);
-            $table->unique(['name', 'guard_name', 'school_id']);
-        });
-        Schema::table('users', static function (Blueprint $table) {
-            $table->foreignId('school_id')->nullable()->after('fcm_id')->references('id')->on('schools')->onDelete('cascade');
-        });
-        /*TODO : Review this*/
-        Schema::create('categories', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->tinyInteger('status')->default(1);
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasColumn('roles', 'school_id')) {
+            Schema::table('roles', static function (Blueprint $table) use ($schoolsTable) {
+                $table->foreignId('school_id')->nullable()->after('guard_name')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->boolean('custom_role')->after('school_id')->default(1);
+                $table->boolean('editable')->after('custom_role')->default(1);
+                $table->dropUnique(['name', 'guard_name']);
+                $table->unique(['name', 'guard_name', 'school_id']);
+            });
+        }
+        if (!Schema::hasColumn('users', 'school_id')) {
+            Schema::table('users', static function (Blueprint $table) use ($schoolsTable) {
+                $table->foreignId('school_id')->nullable()->after('fcm_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+            });
+        }
+        try {
+            if (!Schema::hasTable('categories')) {
+                Schema::create('categories', static function (Blueprint $table) {
+                    $table->id();
+                    $table->string('name', 512);
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->tinyInteger('status')->default(1);
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
 
-        Schema::create('sections', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            if (!Schema::hasTable('sections')) {
+                Schema::create('sections', static function (Blueprint $table) {
+                    $table->id();
+                    $table->string('name', 512);
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
 
-        Schema::create('mediums', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->softDeletes();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('mediums')) {
+            Schema::create('mediums', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 512);
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->softDeletes();
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('session_years', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->tinyInteger('default')->default(0);
-            $table->date('start_date');
-            $table->date('end_date');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->unique(['name', 'school_id']);
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('session_years')) {
+            Schema::create('session_years', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 512);
+                $table->tinyInteger('default')->default(0);
+                $table->date('start_date');
+                $table->date('end_date');
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->unique(['name', 'school_id']);
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::create('semesters', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->tinyInteger('start_month');
-            $table->tinyInteger('end_month');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('semesters')) {
+            Schema::create('semesters', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->tinyInteger('start_month');
+                $table->tinyInteger('end_month');
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::create('languages', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->string('code', 64)->unique();
-            $table->string('file', 512);
-            $table->tinyInteger('status')->default(0)->comment('1=>active');
-            $table->tinyInteger('is_rtl')->default(0);
-            $table->timestamps();
-        });
-        Schema::create('sliders', static function (Blueprint $table) {
-            $table->id();
-            $table->string('image', 1024);
-            $table->string('link')->nullable();
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        if (!$prefix) {
+            Schema::create('languages', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 512);
+                $table->string('code', 64)->unique();
+                $table->string('file', 512);
+                $table->tinyInteger('status')->default(0)->comment('1=>active');
+                $table->tinyInteger('is_rtl')->default(0);
+                $table->timestamps();
+            });
+        }
+        try {
+            if (!Schema::hasTable('sliders')) {
+                Schema::create('sliders', static function (Blueprint $table) {
+                    $table->id();
+                    $table->string('image', 1024);
+                    $table->string('link')->nullable();
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->timestamps();
+                });
+            }
+        } catch (\Exception $e) {}
         /************ Master Tables Ends *******/
 
-        Schema::create('subjects', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->string('code', 64)->nullable();
-            $table->string('bg_color', 32);
-            $table->string('image', 512);
-            $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
-            $table->string('type', 64)->comment('Theory / Practical');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('subjects')) {
+            Schema::create('subjects', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 512);
+                $table->string('code', 64)->nullable();
+                $table->string('bg_color', 32);
+                $table->string('image', 512);
+                $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
+                $table->string('type', 64)->comment('Theory / Practical');
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::create('streams', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('streams')) {
+            Schema::create('streams', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::create('shifts', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->time('start_time', 0);
-            $table->time('end_time', 0);
-            $table->integer('status')->default(1);
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('shifts')) {
+            Schema::create('shifts', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->time('start_time', 0);
+                $table->time('end_time', 0);
+                $table->integer('status')->default(1);
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
-        Schema::create('classes', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 512);
-            $table->tinyInteger('include_semesters')->comment('0 - no 1 - yes')->default(0);
-            $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
-            $table->foreignId('shift_id')->nullable()->references('id')->on('shifts')->onUpdate('cascade')->onDelete('cascade');
-            $table->foreignId('stream_id')->nullable()->references('id')->on('streams')->onUpdate('cascade')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
-
-        Schema::create('elective_subject_groups', static function (Blueprint $table) {
-            $table->id();
-            $table->integer('total_subjects');
-            $table->integer('total_selectable_subjects');
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreignId('semester_id')->nullable()->references('id')->on('semesters')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
-        Schema::create('class_subjects', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreignId('subject_id')->references('id')->on('subjects')->onDelete('cascade');
-            $table->string('type', 32)->comment('Compulsory / Elective');
-            $table->foreignId('elective_subject_group_id')->nullable()->comment('if type=Elective')->references('id')->on('elective_subject_groups')->onDelete('cascade');
-            $table->foreignId('semester_id')->nullable()->references('id')->on('semesters')->onDelete('cascade');
-            $table->integer('virtual_semester_id')->virtualAs('CASE WHEN semester_id IS NOT NULL THEN semester_id ELSE 0 END');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->unique(['class_id', 'subject_id', 'virtual_semester_id'], 'unique_ids');
-            $table->softDeletes();
-            $table->timestamps();
-        });
-        Schema::create('staffs', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->string('qualification', 512)->nullable();
-            $table->double('salary')->default(0);
-            $table->timestamps();
-        });
-        Schema::create('class_sections', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreignId('section_id')->references('id')->on('sections')->onDelete('cascade');
-            $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->unique(['class_id', 'section_id', 'medium_id'], 'unique_id');
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
-        Schema::create('students', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
-            $table->string('admission_no', 512);
-            $table->integer('roll_number')->nullable();
-            $table->date('admission_date');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->foreignId('guardian_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        if (!Schema::hasTable('classes')) {
+            Schema::create('classes', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 512);
+                $table->tinyInteger('include_semesters')->comment('0 - no 1 - yes')->default(0);
+                $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
+                $table->foreignId('shift_id')->nullable()->references('id')->on('shifts')->onUpdate('cascade')->onDelete('cascade');
+                $table->foreignId('stream_id')->nullable()->references('id')->on('streams')->onUpdate('cascade')->onDelete('cascade');
+                $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        }
 
 
-        Schema::create('student_subjects', static function (Blueprint $table) {
-            $table->id();
+        try {
+            if (!Schema::hasTable('elective_subject_groups')) {
+                Schema::create('elective_subject_groups', static function (Blueprint $table) {
+                    $table->id();
+                    $table->integer('total_subjects');
+                    $table->integer('total_selectable_subjects');
+                    $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                    $table->foreignId('semester_id')->nullable()->references('id')->on('semesters')->onDelete('cascade');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
 
-            // TODO : check this
-            $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('class_subject_id')->references('id')->on('class_subjects')->onDelete('cascade');
-            $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            if (!Schema::hasTable('class_subjects')) {
+                Schema::create('class_subjects', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                    $table->foreignId('subject_id')->references('id')->on('subjects')->onDelete('cascade');
+                    $table->string('type', 32)->comment('Compulsory / Elective');
+                    $table->foreignId('elective_subject_group_id')->nullable()->comment('if type=Elective')->references('id')->on('elective_subject_groups')->onDelete('cascade');
+                    $table->foreignId('semester_id')->nullable()->references('id')->on('semesters')->onDelete('cascade');
+                    $table->integer('virtual_semester_id')->virtualAs('CASE WHEN semester_id IS NOT NULL THEN semester_id ELSE 0 END');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->unique(['class_id', 'subject_id', 'virtual_semester_id'], 'unique_ids');
+                    $table->softDeletes();
+                    $table->timestamps();
+                });
+            }
+        } catch (\Exception $e) {}
+        try {
+            if (!Schema::hasTable('staffs')) {
+                Schema::create('staffs', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->string('qualification', 512)->nullable();
+                    $table->double('salary')->default(0);
+                    $table->timestamps();
+                });
+            }
+        } catch (\Exception $e) {}
+        try {
+            if (!Schema::hasTable('class_sections')) {
+                Schema::create('class_sections', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                    $table->foreignId('section_id')->references('id')->on('sections')->onDelete('cascade');
+                    $table->foreignId('medium_id')->references('id')->on('mediums')->onDelete('cascade');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->unique(['class_id', 'section_id', 'medium_id'], 'unique_id');
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
 
-        Schema::create('subject_teachers', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
-            $table->foreignId('subject_id')->references('id')->on('subjects')->onDelete('cascade');
-            $table->foreignId('teacher_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('class_subject_id')->references('id')->on('class_subjects')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-            $table->unique(['class_section_id', 'class_subject_id', 'teacher_id'], 'unique_ids');
-        });
+        try {
+            if (!Schema::hasTable('students')) {
+                Schema::create('students', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
+                    $table->string('admission_no', 512);
+                    $table->integer('roll_number')->nullable();
+                    $table->date('admission_date');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->foreignId('guardian_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
+        try {
+            if (!Schema::hasTable('student_subjects')) {
+                Schema::create('student_subjects', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->foreignId('class_subject_id')->references('id')->on('class_subjects')->onDelete('cascade');
+                    $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
+                    $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->timestamps();
+                    $table->softDeletes();
+                });
+            }
+        } catch (\Exception $e) {}
+
+        try {
+            if (!Schema::hasTable('subject_teachers')) {
+                Schema::create('subject_teachers', static function (Blueprint $table) {
+                    $table->id();
+                    $table->foreignId('class_section_id')->references('id')->on('class_sections')->onDelete('cascade');
+                    $table->foreignId('subject_id')->references('id')->on('subjects')->onDelete('cascade');
+                    $table->foreignId('teacher_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
+                    $table->foreignId('class_subject_id')->references('id')->on('class_subjects')->onDelete('cascade');
+                    $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
+                    $table->timestamps();
+                    $table->softDeletes();
+                    $table->unique(['class_section_id', 'class_subject_id', 'teacher_id'], 'unique_ids');
+                });
+            }
+        } catch (\Exception $e) {}
 
         Schema::create('lessons', static function (Blueprint $table) {
             $table->id();

@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
+
 class Timetable extends Model {
+    use TenantModel;
     protected $fillable = [
         "subject_teacher_id",
         "class_section_id",

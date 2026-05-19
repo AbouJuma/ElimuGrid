@@ -8,6 +8,7 @@ use App\Models\Section;
 use App\Models\Students;
 use App\Models\Subject;
 use App\Models\User;
+use Illuminate\Validation\Rule;
 use App\Models\VirtualClassroom;
 use App\Models\VirtualClassroomAttendance;
 use App\Services\CachingService;
@@ -17,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
 
 class VirtualClassroomController extends Controller
@@ -49,7 +51,7 @@ class VirtualClassroomController extends Controller
         // Permission check bypassed - user has all required permissions
         // ResponseService::noPermissionThenRedirect('virtual-classroom-list');
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         // Get filter parameters
         $request = request();
@@ -103,7 +105,7 @@ class VirtualClassroomController extends Controller
         // Permission check bypassed - user has all required permissions
         // ResponseService::noPermissionThenRedirect('virtual-classroom-create');
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         $classes = ClassSchool::where('school_id', $schoolId)->get();
         $teachers = User::role('Teacher')->where('school_id', $schoolId)->get();
@@ -122,13 +124,36 @@ class VirtualClassroomController extends Controller
         // Permission check bypassed - user has all required permissions
         // ResponseService::noPermissionThenRedirect('virtual-classroom-create');
 
+        // Determine current tenant school ID
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
+
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'class_id' => 'required|exists:classes,id',
-            'section_id' => 'nullable|exists:sections,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'teacher_id' => 'required|exists:users,id',
+            'class_id' => [
+                'required',
+                Rule::exists(ClassSchool::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'section_id' => [
+                'nullable',
+                Rule::exists(Section::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'subject_id' => [
+                'required',
+                Rule::exists(Subject::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'teacher_id' => [
+                'required',
+                Rule::exists(User::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
         ]);
@@ -138,9 +163,9 @@ class VirtualClassroomController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
-            $schoolId = Auth::user()->school_id;
+            $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
             // Generate unique room name
             $roomName = VirtualClassroom::generateRoomName($schoolId, $request->title);
@@ -165,12 +190,12 @@ class VirtualClassroomController extends Controller
                 'school_id' => $schoolId,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return redirect()->route('virtual-classroom.index')
                 ->with('success', trans('Virtual classroom created successfully'));
         } catch (\Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'VirtualClassroomController -> store method');
             return redirect()->back()->with('error', trans('Failed to create virtual classroom'));
         }
@@ -185,7 +210,7 @@ class VirtualClassroomController extends Controller
         // Permission check bypassed - user has all required permissions
         // // ResponseService::noPermissionThenRedirect('virtual-classroom-edit');
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         $virtualClassroom = VirtualClassroom::where('school_id', $schoolId)->findOrFail($id);
 
@@ -214,13 +239,35 @@ class VirtualClassroomController extends Controller
         $this->checkFeatureAccess();
         // ResponseService::noPermissionThenRedirect('virtual-classroom-edit');
 
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
+
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'class_id' => 'required|exists:classes,id',
-            'section_id' => 'nullable|exists:sections,id',
-            'subject_id' => 'required|exists:subjects,id',
-            'teacher_id' => 'required|exists:users,id',
+            'class_id' => [
+                'required',
+                Rule::exists(ClassSchool::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'section_id' => [
+                'nullable',
+                Rule::exists(Section::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'subject_id' => [
+                'required',
+                Rule::exists(Subject::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
+            'teacher_id' => [
+                'required',
+                Rule::exists(User::class, 'id')->where(function ($query) use ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                })
+            ],
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
         ]);
@@ -230,9 +277,7 @@ class VirtualClassroomController extends Controller
         }
 
         try {
-            DB::beginTransaction();
-
-            $schoolId = Auth::user()->school_id;
+            DB::connection('mysql')->beginTransaction();
 
             $virtualClassroom = VirtualClassroom::where('school_id', $schoolId)->findOrFail($id);
 
@@ -257,12 +302,12 @@ class VirtualClassroomController extends Controller
                 'end_time' => Carbon::parse($request->end_time),
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return redirect()->route('virtual-classroom.index')
                 ->with('success', trans('Virtual classroom updated successfully'));
         } catch (\Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'VirtualClassroomController -> update method');
             return redirect()->back()->with('error', trans('Failed to update virtual classroom'));
         }
@@ -278,7 +323,7 @@ class VirtualClassroomController extends Controller
         // ResponseService::noPermissionThenRedirect('virtual-classroom-delete');
 
         try {
-            $schoolId = Auth::user()->school_id;
+            $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
             $virtualClassroom = VirtualClassroom::where('school_id', $schoolId)->findOrFail($id);
 
@@ -305,7 +350,7 @@ class VirtualClassroomController extends Controller
         $this->checkFeatureAccess();
         // // ResponseService::noPermissionThenRedirect('virtual-classroom-join');
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
         $user = Auth::user();
 
         $virtualClassroom = VirtualClassroom::with(['class', 'section', 'subject', 'teacher'])
@@ -361,7 +406,7 @@ class VirtualClassroomController extends Controller
      */
     protected function recordAttendance($virtualClassroomId, $studentId)
     {
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         // Check if already recorded
         $attendance = VirtualClassroomAttendance::where('virtual_classroom_id', $virtualClassroomId)
@@ -379,7 +424,7 @@ class VirtualClassroomController extends Controller
      */
     public function leave(Request $request, $id)
     {
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
         $user = Auth::user();
 
         $virtualClassroom = VirtualClassroom::where('school_id', $schoolId)->findOrFail($id);
@@ -409,7 +454,7 @@ class VirtualClassroomController extends Controller
     public function getSectionsByClass(Request $request)
     {
         $classId = $request->get('class_id');
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         $sections = Section::whereHas('class_sections', function ($q) use ($classId, $schoolId) {
             $q->where('class_id', $classId);
@@ -424,7 +469,7 @@ class VirtualClassroomController extends Controller
     public function getSubjectsByClass(Request $request)
     {
         $classId = $request->get('class_id');
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         $subjects = Subject::whereHas('class_subject', function ($q) use ($classId) {
             $q->where('class_id', $classId);
@@ -442,7 +487,7 @@ class VirtualClassroomController extends Controller
         // Permission check bypassed - user has all required permissions
         // ResponseService::noPermissionThenRedirect('virtual-classroom-report-view');
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
 
         // Get filter parameters
         $classId = $request->get('class_id');
@@ -480,7 +525,7 @@ class VirtualClassroomController extends Controller
     {
         $this->checkFeatureAccess();
 
-        $schoolId = Auth::user()->school_id;
+        $schoolId = Session::get('auth_school_id') ?? Auth::user()->school_id;
         $user = Auth::user();
 
         $query = VirtualClassroom::with(['class', 'section', 'subject', 'teacher'])

@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('form_fields', function (Blueprint $table) {
-            $table->dropColumn('other');
-        });
+        try {
+            Schema::table('form_fields', function (Blueprint $table) {
+                $table->dropColumn('other');
+            });
+        } catch (\Exception $e) {}
     }
 
     /**

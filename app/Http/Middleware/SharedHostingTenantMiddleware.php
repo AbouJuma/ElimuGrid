@@ -30,6 +30,9 @@ class SharedHostingTenantMiddleware
             if ($user && $user->school_id) {
                 // Switch to tenant database using prefix
                 SharedHostingTenantService::switchToTenant($user->school_id);
+            } elseif ($user && $user->school_id === null && session()->has('auth_school_id')) {
+                // Super Admin managing a specific school
+                SharedHostingTenantService::switchToTenant(session()->get('auth_school_id'));
             }
         } catch (\Exception $e) {
             // If tenant switching fails, continue with main database

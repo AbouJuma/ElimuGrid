@@ -54,8 +54,8 @@ class TransportRouteController extends Controller
                     ->where('route_id', $route->id)
                     ->where('effective_from', '<=', now())
                     ->where(function ($q) {
-                        $q->whereNull('effective_until')
-                          ->orWhere('effective_until', '>=', now());
+                        $q->whereNull('effective_to')
+                          ->orWhere('effective_to', '>=', now());
                     })
                     ->whereNull('deleted_at')
                     ->first();
@@ -102,7 +102,7 @@ class TransportRouteController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Create route
             $route = TransportRoute::create([
@@ -122,12 +122,12 @@ class TransportRouteController extends Controller
                 'amount' => $request->fee_amount,
                 'billing_cycle' => $request->billing_cycle,
                 'effective_from' => $request->fee_effective_from,
-                'effective_until' => $request->fee_effective_to,
+                'effective_to' => $request->fee_effective_to,
                 'description' => $request->fee_description,
                 'school_id' => Auth::user()->school_id,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -135,7 +135,7 @@ class TransportRouteController extends Controller
                 'data' => $route->load('activeFee')
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to create route: ' . $e->getMessage()], 500);
         }
     }
@@ -167,7 +167,7 @@ class TransportRouteController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $route = TransportRoute::owner()->findOrFail($id);
 
@@ -183,12 +183,12 @@ class TransportRouteController extends Controller
 
             // Update or create fee
             $existingFee = TransportFee::where('route_id', $route->id)
-                ->whereNull('effective_until')
+                ->whereNull('effective_to')
                 ->first();
 
             if ($existingFee) {
                 // Close existing fee
-                $existingFee->update(['effective_until' => now()->subDay()]);
+                $existingFee->update(['effective_to' => now()->subDay()]);
             }
 
             // Create new fee
@@ -197,12 +197,12 @@ class TransportRouteController extends Controller
                 'amount' => $request->fee_amount,
                 'billing_cycle' => $request->billing_cycle,
                 'effective_from' => $request->fee_effective_from,
-                'effective_until' => $request->fee_effective_to,
+                'effective_to' => $request->fee_effective_to,
                 'description' => $request->fee_description,
                 'school_id' => Auth::user()->school_id,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -210,7 +210,7 @@ class TransportRouteController extends Controller
                 'data' => $route->load('activeFee')
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to update route: ' . $e->getMessage()], 500);
         }
     }
@@ -224,7 +224,7 @@ class TransportRouteController extends Controller
         ResponseService::noPermissionThenRedirect('transport-route-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $route = TransportRoute::owner()->findOrFail($id);
 
@@ -245,14 +245,14 @@ class TransportRouteController extends Controller
             // Soft delete related fees
             TransportFee::where('route_id', $id)->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Route deleted successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to delete route: ' . $e->getMessage()], 500);
         }
     }

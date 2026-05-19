@@ -191,8 +191,8 @@ class LanguageController extends Controller
         app()->setLocale(Session::get('landing_locale'));
 
         Cache::flush();
-        if (Auth::user()) {
-            User::where('id',Auth::user()->id)->update(['language' => $language->code]);
+        if (Session::get('auth_user_id')) { // Use custom session
+            User::where('id', Session::get('auth_user_id'))->update(['language' => $language->code]);
         }
         return redirect()->back();
     }

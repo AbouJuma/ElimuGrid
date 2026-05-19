@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\School;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Log;
 
@@ -35,11 +35,8 @@ class ForgotPasswordController extends Controller
         if ($request->school_code) {
             $school = School::where('code',$request->school_code)->first();
             if ($school) {
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
-                DB::setDefaultConnection('school');    
             }
         }
 

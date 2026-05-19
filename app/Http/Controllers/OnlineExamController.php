@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OnlineExam;
 use App\Models\OnlineExamCommon;
+use Illuminate\Validation\Rule;
 use App\Repositories\ClassSection\ClassSectionInterface;
 use App\Repositories\ClassSubject\ClassSubjectInterface;
 use App\Repositories\OnlineExam\OnlineExamInterface;
@@ -86,7 +88,12 @@ class OnlineExamController extends Controller {
             'class_section_id.*'    => 'numeric',
             'subject_id' => 'required',
             'title'            => 'required',
-            'exam_key'         => 'required|unique:online_exams,exam_key,NULL,id,school_id,' . Auth::user()->school_id,
+            'exam_key'         => [
+                'required',
+                Rule::unique(OnlineExam::class, 'exam_key')->where(function ($query) {
+                    $query->where('school_id', Auth::user()->school_id);
+                })
+            ],
             'duration'         => 'required|numeric|gte:1',
             'start_date'       => 'required',
             'end_date'         => 'required|after:start_date',
@@ -94,7 +101,7 @@ class OnlineExamController extends Controller {
 
         try {
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             // $onlineExamData = array(
             //     'class_section_id' => $request->class_section_id,
@@ -156,10 +163,10 @@ class OnlineExamController extends Controller {
 
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OnlineExamCommon', $onlineExamCommonData['class_section_id'], Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> Store method");
             ResponseService::errorResponse();
         }
@@ -280,7 +287,7 @@ class OnlineExamController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->onlineExam->update($id, array(
                 'title'      => $request->edit_title,
                 'exam_key'   => $request->edit_exam_key,
@@ -288,10 +295,10 @@ class OnlineExamController extends Controller {
                 'start_date' => $request->edit_start_date,
                 'end_date'   => $request->edit_end_date,
             ));
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> Update method");
             ResponseService::errorResponse();
         }
@@ -301,14 +308,14 @@ class OnlineExamController extends Controller {
         ResponseService::noFeatureThenRedirect('Exam Management');
         ResponseService::noPermissionThenSendJson('online-exam-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->onlineExam->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OnlineExam', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> Delete method");
             ResponseService::errorResponse();
         }
@@ -358,7 +365,7 @@ class OnlineExamController extends Controller {
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $currentSemester = $this->cache->getDefaultSemesterData();
             $isClassSemester = $this->classSection->findById($request->class_section_id, ['*'], ['class'])->class->include_semesters;
 
@@ -397,7 +404,7 @@ class OnlineExamController extends Controller {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OnlineExamQuestionOption', $onlineExamQuestionOption->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             ResponseService::successResponse('Data Stored Successfully', array(
                 'exam_id'     => $request->online_exam_id,
@@ -405,7 +412,7 @@ class OnlineExamController extends Controller {
                 'question'    => "<textarea id='qc" . $onlineExamQuestion->id . "'>" . htmlspecialchars_decode($onlineExamQuestion->question) . "</textarea><script>setTimeout(() => {equation_editor = CKEDITOR.inline('qc" . $onlineExamQuestion->id . "', { skin:'moono',extraPlugins: 'mathjax', mathJaxLib: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS_HTML', readOnly:true, }); },1000);</script>"
             ));
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> storeExamQuestionChoices method");
             ResponseService::errorResponse();
         }
@@ -504,7 +511,7 @@ class OnlineExamController extends Controller {
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $onlineExamQuestionChoiceData = array();
             foreach ($request->assign_questions as $question) {
@@ -519,10 +526,10 @@ class OnlineExamController extends Controller {
             // $sessionYear = $this->cache->getDefaultSessionYear();
             // $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OnlineExamQuestionChoice', $onlineExamQuestionChoiceData['question_id'], Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> storeQuestionsChoices method");
             ResponseService::errorResponse();
         }
@@ -536,15 +543,15 @@ class OnlineExamController extends Controller {
             if ($student_submitted_answers) {
                 ResponseService::errorResponse("cannot delete because data is associated with other data");
             } else {
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
                 $this->onlineExamQuestionChoice->deleteById($id);
                 $sessionYear = $this->cache->getDefaultSessionYear();
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OnlineExamQuestionChoice', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse('Data Deleted Successfully');
             }
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Controller -> removeQuestionsChoices method");
             ResponseService::errorResponse();
         }

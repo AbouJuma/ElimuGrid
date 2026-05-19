@@ -14,6 +14,10 @@ return new class extends Migration
      */
     public function up()
     {
+        $prefix = Schema::getConnection()->getConfig('prefix');
+        $dbName = DB::connection('mysql')->getDatabaseName();
+        $usersTable = $dbName . '.users';
+        $schoolsTable = $dbName . '.schools';
         // Add library fine per day setting
         $settings = [
             [
@@ -36,8 +40,17 @@ return new class extends Migration
             ]
         ];
 
+        $school = DB::table('schools')->first();
+        if (!$school) {
+            return;
+        }
+
         foreach ($settings as $setting) {
-            DB::table('school_settings')->insert($setting);
+            $setting['school_id'] = $school->id;
+            DB::table('school_settings')->updateOrInsert(
+                ['name' => $setting['name'], 'school_id' => $school->id],
+                $setting
+            );
         }
     }
 

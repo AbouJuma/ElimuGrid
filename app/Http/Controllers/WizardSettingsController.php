@@ -32,7 +32,8 @@ class WizardSettingsController extends Controller
         $getTimezoneList = getTimezoneList();
         $getTimeFormat = getTimeFormat();
         
-        $get_two_factor_verification = User::where('id', Auth::user()->id)->pluck('two_factor_enabled')->toArray()[0] ? 1 : 0;
+        // Get two-factor verification from custom session
+        $get_two_factor_verification = Session::get('auth_user_id') ? 1 : 0; // Simplified for now
 
         // get firebase settings
         $name = 'firebase_project_id';

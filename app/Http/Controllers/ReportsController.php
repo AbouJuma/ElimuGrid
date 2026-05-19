@@ -1116,8 +1116,8 @@ class ReportsController extends Controller
             // get school settings
             $settings = $this->cache->getSchoolSettings();
             
-            $schoolName = $settings['school_name'];
-            $schoolLogo = $settings['horizontal_logo'];
+            $schoolName = $settings['school_name'] ?? Auth::user()->school->name ?? '';
+            $schoolLogo = $settings['horizontal_logo'] ?? '';
             
             // get exams
             $exams = $this->exam->builder()
@@ -1497,8 +1497,8 @@ class ReportsController extends Controller
             // get school settings
             $settings = $this->cache->getSchoolSettings();
             
-            $schoolName = $settings['school_name'];
-            $schoolLogo = $settings['horizontal_logo'];
+            $schoolName = $settings['school_name'] ?? Auth::user()->school->name ?? '';
+            $schoolLogo = $settings['horizontal_logo'] ?? '';
             
             // get exams
             $exams = $this->exam->builder()
@@ -1862,8 +1862,8 @@ class ReportsController extends Controller
             // get school settings
             $settings = $this->cache->getSchoolSettings();
             
-            $schoolName = $settings['school_name'];
-            $schoolLogo = $settings['horizontal_logo'];
+            $schoolName = $settings['school_name'] ?? Auth::user()->school->name ?? '';
+            $schoolLogo = $settings['horizontal_logo'] ?? '';
             
             // get exams
             $exams = $this->exam->builder()

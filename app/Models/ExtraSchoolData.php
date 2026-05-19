@@ -11,6 +11,7 @@ class ExtraSchoolData extends Model
     use HasFactory;
 
     protected $table = 'extra_school_datas';
+    protected $connection = 'mysql';
 
     protected $fillable = [
         'school_inquiry_id',

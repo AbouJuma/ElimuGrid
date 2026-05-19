@@ -187,7 +187,7 @@ class SubscriptionWebhookController extends Controller
                 if ($paymentTransactionData && $paymentTransactionData->status == "succeed") {
                     Log::info("Razorpay Webhook : Transaction Already Succeed");
                 } else {
-                    DB::beginTransaction();
+                    DB::connection('mysql')->beginTransaction();
                     $paymentTransactionStatus = PaymentTransaction::find($metadata->payment_transaction_id);
                     if ($paymentTransactionStatus) {
                         $paymentTransactionStatus->payment_status = "succeed";
@@ -379,7 +379,7 @@ class SubscriptionWebhookController extends Controller
                 Log::info("Razorpay Webhook : payment.captured");
               
                 http_response_code(200);
-                DB::commit();
+                DB::connection('mysql')->commit();
                
             } elseif ($metadata && isset($data->event) && $data->event == 'payment.failed') {
                 $paymentTransactionData = PaymentTransaction::find($metadata->payment_transaction_id);
@@ -414,7 +414,7 @@ class SubscriptionWebhookController extends Controller
             http_response_code(400);
             exit();
         } catch(Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Razorpay Webhook : Error occurred", [$e->getMessage() . ' --> ' . $e->getFile() . ' At Line : ' . $e->getLine()]);
             http_response_code(400);
             exit();
@@ -515,7 +515,7 @@ class SubscriptionWebhookController extends Controller
             if ($event == 'charge.completed') {
                 Log::info("Updating payment status to succeed for tx_ref: {$txRef}");
                 
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
                 
                 try {
                     
@@ -579,12 +579,12 @@ class SubscriptionWebhookController extends Controller
                         $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.FEATURES'), $schoolId);
                     }
                     
-                    DB::commit();
+                    DB::connection('mysql')->commit();
                     Log::info("Payment processed successfully for tx_ref: {$txRef}");
                     
                     return response()->json(['status' => 'success']);
                 } catch (Exception $e) {
-                    DB::rollBack();
+                    DB::connection('mysql')->rollBack();
                     Log::error("Error processing payment: " . $e->getMessage(), [
                         'trace' => $e->getTraceAsString(),
                         'tx_ref' => $txRef
@@ -604,7 +604,7 @@ class SubscriptionWebhookController extends Controller
             
         } catch (Exception $e) {
             if (DB::transactionLevel() > 0) {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
             }
             
             Log::error("Flutterwave Webhook Error: " . $e->getMessage(), [
@@ -686,7 +686,7 @@ class SubscriptionWebhookController extends Controller
             if ($event == 'charge.success') {
                 Log::info("Updating payment status to succeed for tx_ref: {$txRef}");
                 
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
                 
                 try {
                     $metadata['payment_transaction_id'] = $paymentTransaction->id;
@@ -747,12 +747,12 @@ class SubscriptionWebhookController extends Controller
                         $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.FEATURES'), $schoolId);
                     }
                     
-                    DB::commit();
+                    DB::connection('mysql')->commit();
                     Log::info("Payment processed successfully for tx_ref: {$txRef}");
                     
                     return response()->json(['status' => 'success']);
                 } catch (Exception $e) {
-                    DB::rollBack();
+                    DB::connection('mysql')->rollBack();
                     Log::error("Error processing payment: " . $e->getMessage(), [
                         'trace' => $e->getTraceAsString(),
                         'tx_ref' => $txRef
@@ -864,7 +864,7 @@ class SubscriptionWebhookController extends Controller
         Log::info("Processing {$packageType} package subscription");
         
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             
             // New package subscription
             if ($packageType == 'new') {
@@ -923,12 +923,12 @@ class SubscriptionWebhookController extends Controller
                     ->update(['payment_transaction_id' => $paymentTransactionId]);
             }
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             Log::info("Package payment processed successfully");
             return $new_subscription;
             
         } catch (Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Error in handlePackagePayment: " . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -1116,7 +1116,7 @@ class SubscriptionWebhookController extends Controller
             
             Log::info("Package found: ID={$package->id}, Name={$package->name}, Days={$package->days}");
             
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
                             // Postpaid plan generate bill
                             if ($subscription->package_type == 1) {
@@ -1225,12 +1225,12 @@ class SubscriptionWebhookController extends Controller
             $bill = SubscriptionBill::create($subscription_bill);
             Log::info("Created subscription bill for new subscription: ID={$bill->id}");
             
-                DB::commit();
+                DB::connection('mysql')->commit();
             Log::info("Immediate package change completed successfully");
             return $new_subscription;
             
         } catch (Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             Log::error("Error in processImmediatePackageChange: " . $e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),

@@ -6,9 +6,10 @@ use Awobaz\Compoships\Compoships;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\TenantModel;
 
 class ExamTimetable extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
     use Compoships;
 
     protected $fillable = [

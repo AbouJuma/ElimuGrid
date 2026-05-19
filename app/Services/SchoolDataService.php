@@ -16,53 +16,93 @@ use Illuminate\Support\Facades\File;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Session;
+use App\Services\SharedHostingTenantService;
+use Illuminate\Support\Facades\Schema;
 
 class SchoolDataService {
 
     public function preSettingsSetup($schoolData) {
+        set_time_limit(300);
 
-        DB::setDefaultConnection('school');
-        Config::set('database.connections.school.database', $schoolData->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
-        DB::setDefaultConnection('school');
+        // Always work from central (unprefixed) connection first
+        SharedHostingTenantService::switchToMain();
 
-        $school = New School();
-        $school->id = $schoolData->id;
-        $school->name = $schoolData->name;
-        $school->address = $schoolData->address;
-        $school->support_phone = $schoolData->support_phone;
-        $school->support_email = $schoolData->support_email;
-        $school->tagline = $schoolData->tagline;
-        $school->logo = $schoolData->logo;
-        $school->status = $schoolData->type == "demo" ? 1 : $schoolData->status;
-        $school->domain = $schoolData->domain;
-        $school->database_name = $schoolData->database_name;
-        $school->code = $schoolData->code;
-        $school->created_at = $schoolData->created_at;
-        $school->updated_at = $schoolData->updated_at;
-        $school->save();
+        $prefixName = SharedHostingTenantService::tenantTablePrefix($schoolData->id);
+        DB::connection('mysql')->table('schools')->where('id', $schoolData->id)->update(['database_name' => $prefixName]);
+        $schoolData->database_name = $prefixName;
 
-        $mainUser = DB::connection('mysql')->table('users')->where('id',$schoolData->admin_id)->first();        
+        $mainUser = DB::connection('mysql')->table('users')->where('id', $schoolData->admin_id)->first();
+        if (!$mainUser) {
+            \Log::warning("School admin user not found for tenant provisioning. Proceeding with basic setup. School ID: {$schoolData->id}");
+        }
 
-        $userRow[] = [
-            'id' => $mainUser->id,
-            'first_name' => $mainUser->first_name,
-            'last_name' => $mainUser->last_name,
-            'mobile' => $mainUser->mobile,
-            'email' => $mainUser->email,
-            'password' => $mainUser->password,
-            'school_id' => $mainUser->school_id,
-            'email_verified_at' => $schoolData->type == "demo" ? Carbon::now() : null,
-            'created_at' => $mainUser->created_at,
-            'updated_at' => $mainUser->updated_at,
+        SharedHostingTenantService::createTenantTables($schoolData->id);
+
+        SharedHostingTenantService::switchToTenant($schoolData->id);
+
+        if (!Schema::hasTable('schools')) {
+            SharedHostingTenantService::createBasicTenantTables($schoolData->id);
+        }
+
+        $schoolRow = [
+            'id' => $schoolData->id,
+            'name' => $schoolData->name,
+            'address' => $schoolData->address,
+            'support_phone' => $schoolData->support_phone,
+            'support_email' => $schoolData->support_email,
+            'tagline' => $schoolData->tagline,
+            'logo' => $schoolData->logo,
+            'status' => $schoolData->type == "demo" ? 1 : ($schoolData->status ?? 0),
+            'domain' => $schoolData->domain,
+            'database_name' => $prefixName,
+            'code' => $schoolData->code,
+            'domain_type' => $schoolData->domain_type ?? 'default',
+            'type' => $schoolData->type,
+            'admin_id' => $schoolData->admin_id,
+            'created_at' => $schoolData->created_at,
+            'updated_at' => $schoolData->updated_at,
         ];
 
-        DB::connection('school')->table('users')->insert($userRow);
+        // Tenant FK: schools.admin_id -> users.id and users.school_id -> schools.id.
+        // Insert school first with admin_id null, then tenant user, then link admin_id.
+        $schoolRowInsert = $schoolRow;
+        $schoolRowInsert['admin_id'] = null;
 
-        $school = School::find($schoolData->id);
-        $school->admin_id = $schoolData->admin_id;
-        $school->save();
+        if (!DB::table($prefixName . 'schools')->where('id', $schoolData->id)->exists()) {
+            DB::table($prefixName . 'schools')->insert($this->filterRowForTable($schoolRowInsert, 'schools'));
+        } else {
+            $this->syncTenantSchoolRowFromCentral($schoolData->id, $schoolRow, $prefixName);
+        }
+
+        if ($mainUser) {
+            $userInsert = [
+                'id' => $mainUser->id,
+                'first_name' => $mainUser->first_name,
+                'last_name' => $mainUser->last_name,
+                'mobile' => $mainUser->mobile,
+                'email' => $mainUser->email,
+                'password' => $mainUser->password,
+                'remember_token' => $mainUser->remember_token,
+                'email_verified_at' => $schoolData->type == "demo" ? Carbon::now() : ($mainUser->email_verified_at ?? null),
+                'created_at' => $mainUser->created_at,
+                'updated_at' => $mainUser->updated_at,
+                'school_id' => $schoolData->id,
+            ];
+            if (!DB::table($prefixName . 'users')->where('id', $schoolData->admin_id)->exists()) {
+                if (Schema::hasColumn($prefixName . 'users', 'two_factor_enabled')) {
+                    $userInsert['two_factor_enabled'] = $mainUser->two_factor_enabled ?? 0;
+                }
+                DB::table($prefixName . 'users')->insert($this->filterRowForTable($userInsert, 'users'));
+            }
+
+            $this->ensureTenantSchoolAdminLinked((int) $schoolData->id, (int) $schoolData->admin_id, $prefixName);
+
+            $school = School::find($schoolData->id);
+            if ($school) {
+                $school->admin_id = $schoolData->admin_id;
+                $school->save();
+            }
+        }
 
 
 
@@ -201,29 +241,39 @@ class SchoolDataService {
 
 
         );
-        SchoolSetting::upsert($schoolSettingData, ["name", "school_id"], ["data", "type"]);
+        try {
+            SchoolSetting::upsert($schoolSettingData, ["name", "school_id"], ["data", "type"]);
+        } catch (\Exception $e) {
+            \Log::error("Error inserting school settings for tenant {$schoolData->id}: " . $e->getMessage());
+        }
+        
+        // Switch back to main database
+        SharedHostingTenantService::switchToMain();
     }
     
     public function createPreSetupRole($school) {
-
-        DB::setDefaultConnection('school');
-        Config::set('database.connections.school.database', $school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
-        DB::setDefaultConnection('school');
-
+        // Use new prefix-based approach
         $this->createPermissions();
-
         $this->createSchoolAdminRole($school);
-
-        $schoolAdminUser = User::on('school')->where('id', $school->admin_id)->first();
-        $user = $schoolAdminUser->setConnection('school');
-        $user->assignRole('School Admin');
-
+        $this->assignSchoolAdminRole($school);
         $this->defaultRoles($school);
-
-        // Create teacher role
         $this->createTeacherRole($school);
+    }
+
+    public function assignSchoolAdminRole($school) {
+        $prefix = SharedHostingTenantService::tenantTablePrefix($school->id);
+        $schoolAdminUser = DB::table($prefix . 'users')->where('id', $school->admin_id)->first();
+        if ($schoolAdminUser) {
+            // Assign role using direct database insertion with prefix
+            $role = DB::table($prefix . 'roles')->where('name', 'School Admin')->first();
+            if ($role) {
+                DB::table($prefix . 'model_has_roles')->updateOrInsert([
+                    'role_id' => $role->id,
+                    'model_type' => 'App\\Models\\User',
+                    'model_id' => $schoolAdminUser->id
+                ]);
+            }
+        }
     }
 
     public function defaultRoles($school)
@@ -232,55 +282,26 @@ class SchoolDataService {
         Role::updateOrCreate(['name' => 'Student', 'school_id' => $school->id, 'custom_role' => 0, 'editable' => 0]);
     }
 
+    /**
+     * Ensure the school uses prefixed tables on the shared database and run tenant migrations.
+     * (Legacy name kept for upgrade migrations and tooling.)
+     */
     public function createDatabaseMigration($schoolData)
     {
-        // Prevent PHP timeout during long migrations (300 seconds = 5 minutes)
         set_time_limit(300);
-        
-        $school_name = str_replace('.','_',$schoolData->name);
-        // $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name," "));
-        
-        // Check if $school_name is an array and convert it to a string
-        if (is_array($school_name)) {
-            $school_name = implode(" ", $school_name); // Join the array elements into a string
-        }
-        
-        // Now apply strtok and strtolower
-        $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name, " "));
+        SharedHostingTenantService::switchToMain();
 
-            
-        $query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME =  ?";
+        $prefixName = SharedHostingTenantService::tenantTablePrefix($schoolData->id);
+        DB::connection('mysql')->table('schools')->where('id', $schoolData->id)->update(['database_name' => $prefixName]);
+        $schoolData->database_name = $prefixName;
 
-        $db = DB::select($query, [$database_name]);
-        
-        // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
-        // if (empty($db)) {
-        //     DB::statement("CREATE DATABASE IF NOT EXISTS `{$database_name}`");
-        // }
-
-        $schoolData->database_name = $database_name;
-        $schoolData->save();
-        
-        // Artisan::call('migrate:school');
-        Config::set('database.connections.school.database', $schoolData->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
-        DB::setDefaultConnection('school');
-        
-        // Set MySQL session timeouts for this connection to prevent hanging
-        DB::statement('SET SESSION wait_timeout=300, SESSION interactive_timeout=300, SESSION net_read_timeout=300, SESSION net_write_timeout=300');
-        
-        Artisan::call('migrate', [
-            '--database' => 'school',
-            '--path' => 'database/migrations/schools',
-            '--force' => true,
-        ]);
-        
+        SharedHostingTenantService::createTenantTables($schoolData->id);
+        SharedHostingTenantService::switchToMain();
+        DB::setDefaultConnection('mysql');
     }
 
-    public function createPermissions() {
-
-        $permissions = [
+    public static function getTenantPermissionsList() {
+        return [
             ...self::permission('role'),
             ...self::permission('medium'),
             ...self::permission('section'),
@@ -396,8 +417,31 @@ class SchoolDataService {
             ['name' => 'reports-student'],
             ['name' => 'reports-exam'],
 
+            // Hostel
+            ...self::permission('hostel'),
+            ...self::permission('room'),
+            ...self::permission('hostel-allocation'),
+            ['name' => 'hostel-report-view'],
 
+            // Transport
+            ...self::permission('transport-route'),
+            ...self::permission('transport-vehicle'),
+            ...self::permission('transport-driver'),
+            ...self::permission('transport-stop'),
+            ...self::permission('transport-allocation'),
+            ...self::permission('transport-fee', ['generate']),
+            ['name' => 'transport-report-view'],
+
+            // Virtual Classroom
+            ...self::permission('virtual-classroom'),
+            ['name' => 'virtual-classroom-reports'],
+            ['name' => 'virtual-classroom-upcoming'],
+            ['name' => 'virtual-classroom-live'],
         ];
+    }
+
+    public function createPermissions() {
+        $permissions = self::getTenantPermissionsList();
         $permissions = array_map(static function ($data) {
             $data['guard_name'] = 'web';
             return $data;
@@ -420,243 +464,12 @@ class SchoolDataService {
     }
 
     public function createSchoolAdminRole($school) {
-        $role = Role::withoutGlobalScope('school')->updateOrCreate(['name' => 'School Admin', 'custom_role' => 0, 'editable' => 0, 'school_id' => $school->id]);
-        $SchoolAdminHasAccessTo = [
-            'medium-list',
-            'medium-create',
-            'medium-edit',
-            'medium-delete',
-
-            'section-list',
-            'section-create',
-            'section-edit',
-            'section-delete',
-
-            'class-list',
-            'class-create',
-            'class-edit',
-            'class-delete',
-
-            'class-section-list',
-            'class-section-create',
-            'class-section-edit',
-            'class-section-delete',
-
-            'subject-list',
-            'subject-create',
-            'subject-edit',
-            'subject-delete',
-
-            'teacher-list',
-            'teacher-create',
-            'teacher-edit',
-            'teacher-delete',
-
-            'guardian-list',
-            'guardian-create',
-            'guardian-edit',
-            'guardian-delete',
-
-            'session-year-list',
-            'session-year-create',
-            'session-year-edit',
-            'session-year-delete',
-
-            'student-list',
-            'student-create',
-            'student-edit',
-            'student-delete',
-
-            'timetable-list',
-            'timetable-create',
-            'timetable-edit',
-            'timetable-delete',
-
-            'attendance-list',
-
-            'holiday-list',
-            'holiday-create',
-            'holiday-edit',
-            'holiday-delete',
-
-            'announcement-list',
-            'announcement-create',
-            'announcement-edit',
-            'announcement-delete',
-
-            'slider-list',
-            'slider-create',
-            'slider-edit',
-            'slider-delete',
-
-            'exam-create',
-            'exam-list',
-            'exam-edit',
-            'exam-delete',
-
-            'exam-timetable-create',
-            'exam-timetable-list',
-            'exam-timetable-delete',
-
-            'exam-result',
-            'exam-result-edit',
-
-            'assignment-submission',
-
-            'student-reset-password',
-            'reset-password-list',
-            'student-change-password',
-
-            'promote-student-list',
-            'promote-student-create',
-            'promote-student-edit',
-            'promote-student-delete',
-
-            'transfer-student-list',
-            'transfer-student-create',
-            'transfer-student-edit',
-            'transfer-student-delete',
-
-            'fees-paid',
-            'fees-config',
-
-            'form-fields-list',
-            'form-fields-create',
-            'form-fields-edit',
-            'form-fields-delete',
-
-            'grade-create',
-            'grade-list',
-            'grade-edit',
-            'grade-delete',
-
-            'school-setting-manage',
-
-            'fees-type-list',
-            'fees-type-create',
-            'fees-type-edit',
-            'fees-type-delete',
-
-            'fees-class-list',
-            'fees-class-create',
-            'fees-class-edit',
-            'fees-class-delete',
-
-
-            'online-exam-create',
-            'online-exam-list',
-            'online-exam-edit',
-            'online-exam-delete',
-            'online-exam-questions-create',
-            'online-exam-questions-list',
-            'online-exam-questions-edit',
-            'online-exam-questions-delete',
-            'online-exam-result-list',
-
-            'role-list',
-            'role-create',
-            'role-edit',
-            'role-delete',
-
-            'staff-list',
-            'staff-create',
-            'staff-edit',
-            'staff-delete',
-
-            'expense-category-list',
-            'expense-category-create',
-            'expense-category-edit',
-            'expense-category-delete',
-
-            'expense-list',
-            'expense-create',
-            'expense-edit',
-            'expense-delete',
-
-            'fees-list',
-            'fees-create',
-            'fees-edit',
-            'fees-delete',
-
-            'semester-list',
-            'semester-create',
-            'semester-edit',
-            'semester-delete',
-
-            'payroll-list',
-            'payroll-create',
-            'payroll-edit',
-            'payroll-delete',
-
-            'stream-list',
-            'stream-create',
-            'stream-edit',
-            'stream-delete',
-
-            'shift-list',
-            'shift-create',
-            'shift-edit',
-            'shift-delete',
-
-            'approve-leave',
-            'id-card-settings',
-
-            'gallery-list',
-            'gallery-create',
-            'gallery-edit',
-            'gallery-delete',
-
-            'notification-list',
-            'notification-create',
-            'notification-delete',
-
-            'certificate-list',
-            'certificate-create', 
-            'certificate-edit',
-            'certificate-delete',
-
-            'payroll-settings-list',
-            'payroll-settings-create',
-            'payroll-settings-edit',
-            'payroll-settings-delete',
-
-            'school-web-settings',
-
-            'faqs-list',
-            'faqs-create',
-            'faqs-edit',
-            'faqs-delete',
-
-            'class-group-list',
-            'class-group-create',
-            'class-group-edit',
-            'class-group-delete',
-
-            'email-template',
-            'database-backup',
-            'view-exam-marks',
-            'assign-elective-subject-list',
-            'assign-elective-subject-create',
-            'assign-elective-subject-edit',
-            'assign-elective-subject-delete',
-
-            'report-list',
-            'reports-student',
-            'reports-exam',
-            'contact-inquiry-list',
-
-            'book-list',
-            'book-create',
-            'book-edit',
-            'book-delete',
-            'book-issue-list',
-            'book-issue-create',
-            'book-issue-return',
-            'book-report-view',
-
-        ];
+        $role = Role::withoutGlobalScope('school')->updateOrCreate(['name' => 'School Admin', 'school_id' => $school->id], ['custom_role' => 0, 'editable' => 1]);
         
-        $role->syncPermissions($SchoolAdminHasAccessTo);
+        $permissions = self::getTenantPermissionsList();
+        $permissionNames = array_column($permissions, 'name');
+        
+        $role->syncPermissions($permissionNames);
     }
 
     public function createTeacherRole($school)
@@ -709,9 +522,53 @@ class SchoolDataService {
         ];
         $teacher_role->syncPermissions($TeacherHasAccessTo);
     }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function filterRowForTable(array $row, string $table): array
+    {
+        if (!Schema::hasTable($table)) {
+            return $row;
+        }
+
+        $columns = Schema::getColumnListing($table);
+
+        return array_intersect_key($row, array_flip($columns));
+    }
+
+    /**
+     * @param  array<string, mixed>  $schoolRow
+     */
+    private function syncTenantSchoolRowFromCentral(int $schoolId, array $schoolRow, string $tablePrefix = ''): void
+    {
+        $prefixedTable = $tablePrefix . 'schools';
+        $patch = $this->filterRowForTable($schoolRow, $prefixedTable);
+        unset($patch['id'], $patch['created_at'], $patch['admin_id']);
+        if (count($patch) === 0) {
+            return;
+        }
+        $patch['updated_at'] = $schoolRow['updated_at'] ?? Carbon::now();
+        DB::table($prefixedTable)->where('id', $schoolId)->update($patch);
+    }
+
+    private function ensureTenantSchoolAdminLinked(int $schoolId, int $adminId, string $tablePrefix = ''): void
+    {
+        $prefixedTable = $tablePrefix . 'schools';
+        if (!Schema::hasTable($prefixedTable) || !Schema::hasColumn($prefixedTable, 'admin_id')) {
+            return;
+        }
+        DB::table($prefixedTable)->where('id', $schoolId)->update([
+            'admin_id' => $adminId,
+            'updated_at' => Carbon::now(),
+        ]);
+    }
     
     public static  function switchToMainDatabase()
     {
+        SharedHostingTenantService::switchToMain();
+        SharedHostingTenantService::resetSchoolDatabaseConnection();
         DB::setDefaultConnection('mysql');
         Session::forget('school_database_name');
         Session::flush();
@@ -723,10 +580,14 @@ class SchoolDataService {
     {
         $school_database = School::where('id',$school_id)->pluck('database_name')->first();
 
-        DB::setDefaultConnection('school');
-        Config::set('database.connections.school.database', $school_database);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        if (SharedHostingTenantService::usesPrefixedTenantTables($school_database)) {
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database);
+            DB::setDefaultConnection('school');
+            Session::put('school_database_name', $school_database);
+            return;
+        }
+
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database);
         DB::setDefaultConnection('school');
 
         Session::put('school_database_name', $school_database);
@@ -746,26 +607,35 @@ class SchoolDataService {
             if (!$school->database_name) continue;
 
             try {
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                if (SharedHostingTenantService::usesPrefixedTenantTables($school->database_name)) {
+                    SharedHostingTenantService::switchToTenant($school->id);
+                    $instance->createPermissions();
+                    $instance->createSchoolAdminRole($school);
+                    $instance->assignSchoolAdminRole($school);
+                    $instance->createTeacherRole($school);
+                    continue;
+                }
+
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
 
                 // Re-run permission creation and role sync
                 $instance->createPermissions();
                 $instance->createSchoolAdminRole($school);
+                $instance->assignSchoolAdminRole($school);
                 $instance->createTeacherRole($school);
             } catch (\Exception $e) {
                 \Log::error("Failed to sync permissions for school {$school->name}: " . $e->getMessage());
+            } finally {
+                SharedHostingTenantService::switchToMain();
             }
         }
 
         // Switch back to main
+        SharedHostingTenantService::switchToMain();
+        SharedHostingTenantService::resetSchoolDatabaseConnection();
         DB::setDefaultConnection('mysql');
-        Config::set('database.connections.school.database', '');
-        DB::purge('school');
         DB::connection('mysql')->reconnect();
         DB::setDefaultConnection('mysql');
     }
-    
 }

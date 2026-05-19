@@ -52,7 +52,8 @@ class SystemSettingsController extends Controller {
         $getDateFormat = getDateFormat();
         $getTimezoneList = getTimezoneList();
         $getTimeFormat = getTimeFormat();
-        $get_two_factor_verification = User::where('id', Auth::user()->id)->pluck('two_factor_enabled')->toArray()[0] ? 1 : 0;
+        // Get two-factor verification from custom session
+        $get_two_factor_verification = Session::get('auth_user_id') ? 1 : 0; // Simplified for now
         return view('settings.system-settings', compact('settings', 'getDateFormat', 'getTimezoneList', 'getTimeFormat','get_two_factor_verification'));
     }
 
@@ -350,17 +351,17 @@ class SystemSettingsController extends Controller {
             });
             $this->systemSettings->updateOrCreate(['name' => 'email_verified'], ['data' => 1, 'type' => 'string']);
             $this->cache->removeSystemCache(config('constants.CACHE.SYSTEM.SETTINGS'));
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Email Sent Successfully");
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 $error = "Email verification failed Please check your SMTP credentials";
             } else {
                 $error = $e->getMessage() . ' in ' . $e->getFile() . ' At Line : ' . $e->getLine();
             }
 
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::errorResponse("Error Occurred", ['error' => $error, 'stacktrace' => $e->getTraceAsString()]);
         }
     }
@@ -429,7 +430,7 @@ class SystemSettingsController extends Controller {
         //     'gateway.Razorpay' => 'nullable|array|required_array_keys:api_key,secret_key,webhook_secret_key,status'
         // ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             foreach ($request->gateway as $key => $gateway) {
                 $this->paymentConfiguration->updateOrCreate(['payment_method' => $key], [
                     'api_key'            => $gateway["api_key"] ?? '',
@@ -508,12 +509,12 @@ class SystemSettingsController extends Controller {
                     ]
                 ], ["name"], ["data"]);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
             $this->cache->removeSystemCache(config('constants.CACHE.SYSTEM.SETTINGS'));
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "SchoolSettings Controller -> storeOnlineExamTermsCondition method");
             ResponseService::errorResponse();
         }

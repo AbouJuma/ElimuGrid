@@ -5,10 +5,11 @@ namespace App\Models;
 use Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantModel;
 
 class Chat extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['sender_id','receiver_id'];
     protected $appends = ['last_message','user'];
 

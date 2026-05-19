@@ -73,7 +73,7 @@ class GalleryController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             if ($request->youtube_links) {
                 $links = explode(",", $request->youtube_links);
                 $status = 1;
@@ -150,10 +150,10 @@ class GalleryController extends Controller
                 $this->files->createBulk($galleryFileData);
             }
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, "Gallery Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -253,7 +253,7 @@ class GalleryController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             if ($request->youtube_links) {
                 $links = explode(",", $request->youtube_links);
@@ -331,10 +331,10 @@ class GalleryController extends Controller
                 $this->files->createBulk($galleryFileData);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, "Gallery Controller -> Update Method");
             ResponseService::errorResponse();
         }
@@ -349,7 +349,7 @@ class GalleryController extends Controller
         ResponseService::noFeatureThenRedirect('School Gallery Management');
         ResponseService::noPermissionThenSendJson('gallery-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Find the Data by FindByID
             $gallery = $this->gallery->findById($id);
@@ -369,10 +369,10 @@ class GalleryController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Gallery', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Gallery Controller -> destroy Method");
             ResponseService::errorResponse();
         }
@@ -382,7 +382,7 @@ class GalleryController extends Controller
         ResponseService::noFeatureThenRedirect('School Gallery Management');
         ResponseService::noPermissionThenSendJson('gallery-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Find the Data by FindByID
             $file = $this->files->findById($id);
@@ -393,10 +393,10 @@ class GalleryController extends Controller
             // Delete the file data
             $file->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Gallery Controller -> deleteFile Method");
             ResponseService::errorResponse();
         }

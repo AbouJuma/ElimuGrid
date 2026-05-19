@@ -60,7 +60,7 @@ class OnlineExamQuestionController extends Controller {
         ResponseService::noFeatureThenRedirect('Exam Management');
         ResponseService::noPermissionThenRedirect('online-exam-questions-create');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
             
             if (empty($section_ids)) {
@@ -139,10 +139,10 @@ class OnlineExamQuestionController extends Controller {
                 $semester ? $semester->id : null
             );
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Question Controller -> Store method");
             ResponseService::errorResponse();
         }
@@ -261,7 +261,7 @@ class OnlineExamQuestionController extends Controller {
         ResponseService::noFeatureThenRedirect('Exam Management');
         ResponseService::noPermissionThenSendJson('online-exam-questions-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $onlineExamQuestionData = array(
                 'question'       => htmlspecialchars($request->question, ENT_QUOTES | ENT_HTML5),
                 'note'           => $request->note,
@@ -288,10 +288,10 @@ class OnlineExamQuestionController extends Controller {
                 }
             }
             $this->onlineExamQuestionOption->upsert($onlineExamOptionData, ["id"], ["question_id", "option", "is_answer"]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Online Exam Question Controller -> Update method");
             ResponseService::errorResponse();
         }

@@ -123,7 +123,7 @@ class LessonController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
         
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
             $lessonFileData = [];
@@ -204,15 +204,15 @@ class LessonController extends Controller {
             $subjectName = $this->subject->builder()->where('id', $request->subject_id)->first();
             send_notification($user, 'Lesson Alert !!!', 'New Lesson added for ' . $subjectName->name, 'lesson');
         
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             
             if (Str::contains($e->getMessage(), ['does not exist', 'file_get_contents'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Lesson Controller -> Store Method");
                 ResponseService::errorResponse();
             }
@@ -391,7 +391,7 @@ class LessonController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $lesson = $this->lesson->update($id, $request->all());
 
             //Add the new Files
@@ -467,16 +467,16 @@ class LessonController extends Controller {
             $type = "lesson";
            
             send_notification($user, $title, $body, $type);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Lesson Controller -> Update Method");
                 ResponseService::errorResponse();
             }
@@ -522,7 +522,7 @@ class LessonController extends Controller {
                 ResponseService::successResponse('Data Deleted Successfully');
             }
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Lesson Controller -> Destroy method");
             ResponseService::errorResponse();
         }
@@ -565,7 +565,7 @@ class LessonController extends Controller {
         ResponseService::noFeatureThenRedirect('Lesson Management');
         ResponseService::noAnyPermissionThenRedirect(['lesson-delete', 'topic-delete']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Find the Data by FindByID
             $file = $this->files->findById($id);
@@ -573,10 +573,10 @@ class LessonController extends Controller {
             // Delete the file data
             $file->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Lesson Controller -> deleteFile Method");
             ResponseService::errorResponse();
         }

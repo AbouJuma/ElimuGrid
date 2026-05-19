@@ -41,36 +41,30 @@ class HostelAllocationController extends Controller
     public function getAllocations(Request $request)
     {
         try {
-            $query = DB::connection('school')->table('hostel_allocations as ha')
-                ->leftJoin('users as u', 'ha.student_id', '=', 'u.id')
-                ->leftJoin('class_schools as cs', 'ha.class_id', '=', 'cs.id')
-                ->leftJoin('hostels as h', 'ha.hostel_id', '=', 'h.id')
-                ->leftJoin('rooms as r', 'ha.room_id', '=', 'r.id')
-                ->whereNull('ha.deleted_at')
-                ->where('ha.school_id', Auth::user()->school_id)
-                ->select('ha.*', 'u.first_name', 'u.last_name', 'u.email', 'cs.name as class_name', 'h.name as hostel_name', 'r.room_number');
+            $query = HostelAllocation::owner()
+                ->with(['student', 'classSchool', 'hostel', 'room']);
 
             // Apply filters
             if ($request->has('hostel_id') && $request->hostel_id) {
-                $query->where('ha.hostel_id', $request->hostel_id);
+                $query->where('hostel_id', $request->hostel_id);
             }
 
             if ($request->has('class_id') && $request->class_id) {
-                $query->where('ha.class_id', $request->class_id);
+                $query->where('class_id', $request->class_id);
             }
 
             if ($request->has('room_id') && $request->room_id) {
-                $query->where('ha.room_id', $request->room_id);
+                $query->where('room_id', $request->room_id);
             }
 
             if ($request->has('status') && $request->status) {
-                $query->where('ha.status', $request->status);
+                $query->where('status', $request->status);
             }
 
-            $allocations = $query->orderBy('ha.allocation_date', 'desc')->get();
+            $allocations = $query->orderBy('allocation_date', 'desc')->get();
 
             $allocationData = $allocations->map(function ($allocation) {
-                $studentName = trim(($allocation->first_name ?? '') . ' ' . ($allocation->last_name ?? '')) ?: 'Unknown Student';
+                $studentName = $allocation->student ? trim($allocation->student->first_name . ' ' . $allocation->student->last_name) : 'Unknown Student';
 
                 $statusBadge = $allocation->status === 'active'
                     ? '<span class="badge badge-success">Active</span>'
@@ -85,13 +79,13 @@ class HostelAllocationController extends Controller
                 return [
                     'id' => $allocation->id,
                     'student_name' => $studentName,
-                    'student_email' => $allocation->email ?? '',
-                    'class_name' => $allocation->class_name ?? 'Unknown',
-                    'hostel_name' => $allocation->hostel_name ?? 'Unknown',
-                    'room_number' => $allocation->room_number ?? 'Unknown',
+                    'student_email' => $allocation->student->email ?? '',
+                    'class_name' => $allocation->classSchool->name ?? 'Unknown',
+                    'hostel_name' => $allocation->hostel->name ?? 'Unknown',
+                    'room_number' => $allocation->room->room_number ?? 'Unknown',
                     'bed_number' => $allocation->bed_number ?? '-',
-                    'allocation_date' => $allocation->allocation_date,
-                    'checkout_date' => $allocation->checkout_date ?? '-',
+                    'allocation_date' => $allocation->allocation_date ? $allocation->allocation_date->format('Y-m-d') : '',
+                    'checkout_date' => $allocation->checkout_date ? $allocation->checkout_date->format('Y-m-d') : '-',
                     'status' => $statusBadge,
                     'operate' => $operateButtons,
                 ];
@@ -115,10 +109,10 @@ class HostelAllocationController extends Controller
         ResponseService::noPermissionThenRedirect('hostel-allocation-create');
 
         $validator = Validator::make($request->all(), [
-            'student_id' => 'required|exists:users,id',
-            'class_id' => 'required|exists:class_schools,id',
-            'hostel_id' => 'required|exists:hostels,id',
-            'room_id' => 'required|exists:rooms,id',
+            'student_id' => 'required|exists:' . (new \App\Models\User)->getTable() . ',id',
+            'class_id' => 'required|exists:' . (new \App\Models\ClassSchool)->getTable() . ',id',
+            'hostel_id' => 'required|exists:' . (new Hostel)->getTable() . ',id',
+            'room_id' => 'required|exists:' . (new Room)->getTable() . ',id',
             'bed_number' => 'nullable|string|max:50',
             'allocation_date' => 'required|date',
         ]);
@@ -128,7 +122,7 @@ class HostelAllocationController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check if student already has an active allocation
             $existingAllocation = HostelAllocation::owner()
@@ -165,7 +159,7 @@ class HostelAllocationController extends Controller
             // Increment occupied beds in room
             $room->increment('occupied_beds');
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -173,7 +167,7 @@ class HostelAllocationController extends Controller
                 'data' => $allocation
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to allocate student: ' . $e->getMessage()], 500);
         }
     }
@@ -187,7 +181,7 @@ class HostelAllocationController extends Controller
         ResponseService::noPermissionThenRedirect('hostel-allocation-edit');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $allocation = HostelAllocation::owner()->where('status', 'active')->findOrFail($id);
 
@@ -200,14 +194,14 @@ class HostelAllocationController extends Controller
                 $room->decrement('occupied_beds');
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Student checked out successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to check out student: ' . $e->getMessage()], 500);
         }
     }
@@ -221,7 +215,7 @@ class HostelAllocationController extends Controller
         ResponseService::noPermissionThenRedirect('hostel-allocation-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $allocation = HostelAllocation::owner()->findOrFail($id);
 
@@ -235,14 +229,14 @@ class HostelAllocationController extends Controller
 
             $allocation->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Allocation deleted successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to delete allocation: ' . $e->getMessage()], 500);
         }
     }
@@ -315,24 +309,20 @@ class HostelAllocationController extends Controller
         try {
             $hostelId = $request->get('hostel_id');
 
-            $query = DB::connection('school')->table('rooms as r')
-                ->leftJoin('hostels as h', 'r.hostel_id', '=', 'h.id')
-                ->whereNull('r.deleted_at')
-                ->where('r.school_id', Auth::user()->school_id)
-                ->select('r.*', 'h.name as hostel_name');
+            $query = Room::owner()->with('hostel');
 
             if ($hostelId) {
-                $query->where('r.hostel_id', $hostelId);
+                $query->where('hostel_id', $hostelId);
             }
 
-            $rooms = $query->orderBy('h.name')->orderBy('r.room_number')->get();
+            $rooms = $query->get();
 
             $reportData = $rooms->map(function ($room) {
                 $availableBeds = $room->capacity - $room->occupied_beds;
                 $occupancyRate = $room->capacity > 0 ? round(($room->occupied_beds / $room->capacity) * 100, 2) : 0;
 
                 return [
-                    'hostel_name' => $room->hostel_name ?? 'Unknown',
+                    'hostel_name' => $room->hostel->name ?? 'Unknown',
                     'room_number' => $room->room_number,
                     'capacity' => $room->capacity,
                     'occupied_beds' => $room->occupied_beds,
@@ -362,22 +352,19 @@ class HostelAllocationController extends Controller
                 return response()->json(['data' => []]);
             }
 
-            $students = DB::connection('school')->table('students as s')
-                ->leftJoin('users as u', 's.user_id', '=', 'u.id')
-                ->leftJoin('class_sections as cs', 's.class_section_id', '=', 'cs.id')
-                ->leftJoin('class_schools as c', 'cs.class_id', '=', 'c.id')
-                ->where('c.id', $classId)
-                ->whereNull('s.deleted_at')
-                ->whereNull('u.deleted_at')
-                ->where('s.school_id', Auth::user()->school_id)
-                ->select('s.id', 'u.first_name', 'u.last_name', 'u.email', 'u.id as user_id')
-                ->orderBy('u.first_name')
+            $students = \App\Models\User::role('Student')
+                ->whereHas('student', function ($query) use ($classId) {
+                    $query->whereHas('class_section', function ($q) use ($classId) {
+                        $q->where('class_id', $classId);
+                    });
+                })
+                ->select('id', 'first_name', 'last_name', 'email')
                 ->get()
                 ->map(function ($student) {
                     return [
-                        'id' => $student->id,
+                        'id' => $student->student->id ?? 0,
                         'user' => [
-                            'id' => $student->user_id,
+                            'id' => $student->id,
                             'first_name' => $student->first_name,
                             'last_name' => $student->last_name,
                             'email' => $student->email,

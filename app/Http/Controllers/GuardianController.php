@@ -55,7 +55,7 @@ class GuardianController extends Controller {
             'mobile'     => 'required',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $guardian = $this->user->create($request->all());
             $guardian->assignRole('Guardian');
             $sessionYear = $this->cache->getDefaultSessionYear();
@@ -65,10 +65,10 @@ class GuardianController extends Controller {
             } else {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Guardian', $guardian->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Created Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Guardian Controller -> Store method");
             ResponseService::errorResponse();
         }

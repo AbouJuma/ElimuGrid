@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\TenantModel;
 
 class ExtraStudentData extends Model {
     use HasFactory;
     use SoftDeletes;
+    use TenantModel;
 
     protected $table = 'extra_user_datas';
 

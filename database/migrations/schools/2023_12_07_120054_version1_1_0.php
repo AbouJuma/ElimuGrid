@@ -12,6 +12,8 @@ return new class extends Migration {
      */
     public function up(): void {
         set_time_limit(0);
+        $schoolsTable = 'schools';
+        $usersTable = 'users';
         //Remove the OLD Tables
         Schema::disableForeignKeyConstraints();
         Schema::dropIfExists('fees');
@@ -29,202 +31,242 @@ return new class extends Migration {
 
         /*---- START : Master Tables ----*/
 
-        Schema::create('fees', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->date('due_date');
-            $table->float('due_charges')->comment('in percentage (%)');
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('restrict');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('fees', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('name');
+                $table->date('due_date');
+                $table->float('due_charges')->comment('in percentage (%)');
+                $table->foreignId('class_id')->references('id')->on('classes')->onDelete('restrict');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('fees_types', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('description')->nullable();
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('fees_types', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('name');
+                $table->string('description')->nullable();
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
         /*---- END : Master Tables ----*/
 
-        Schema::create('fees_installments', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->date('due_date');
-            $table->integer('due_charges')->comment('in percentage (%)');
-            $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('fees_installments', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('name');
+                $table->date('due_date');
+                $table->integer('due_charges')->comment('in percentage (%)');
+                $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
+                $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('fees_class_types', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
-            $table->foreignId('fees_type_id')->references('id')->on('fees_types')->onDelete('cascade');
-            $table->float('amount');
-            $table->boolean('optional')->comment('0 - No, 1 - Yes');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->unique(['class_id', 'fees_type_id', 'school_id', 'fees_id'], 'unique_ids');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('fees_class_types', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
+                $table->foreignId('fees_type_id')->references('id')->on('fees_types')->onDelete('cascade');
+                $table->float('amount');
+                $table->boolean('optional')->comment('0 - No, 1 - Yes');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->unique(['class_id', 'fees_type_id', 'school_id', 'fees_id'], 'unique_ids');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('payment_transactions', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->double('amount', 8, 2);
-            $table->string('payment_gateway', 128);
-            $table->string('order_id')->comment('order_id / payment_intent_id')->nullable();
-            $table->string('payment_id')->nullable();
-            $table->string('payment_signature')->nullable();
-            $table->enum('payment_status', ['failed', 'succeed', 'pending']);
-            $table->foreignId('school_id')->nullable()->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('payment_transactions', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->double('amount', 8, 2);
+                $table->string('payment_gateway', 128);
+                $table->string('order_id')->comment('order_id / payment_intent_id')->nullable();
+                $table->string('payment_id')->nullable();
+                $table->string('payment_signature')->nullable();
+                $table->enum('payment_status', ['failed', 'succeed', 'pending']);
+                $table->foreignId('school_id')->nullable()->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('fees_paids', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
-            $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            //$table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->boolean('is_fully_paid')->comment('0 - No, 1 - Yes');
-            $table->boolean('is_used_installment')->comment('0 - No, 1 - Yes');
-            $table->double('amount', 8, 2);
-            $table->date('date');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            //$table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->unique(['student_id', 'fees_id', 'school_id'], 'unique_ids');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('fees_paids', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('fees_id')->references('id')->on('fees')->onDelete('cascade');
+                $table->foreignId('student_id')->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                //$table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                $table->boolean('is_fully_paid')->comment('0 - No, 1 - Yes');
+                $table->boolean('is_used_installment')->comment('0 - No, 1 - Yes');
+                $table->double('amount', 8, 2);
+                $table->date('date');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                //$table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->unique(['student_id', 'fees_id', 'school_id'], 'unique_ids');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('compulsory_fees', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('payment_transaction_id')->nullable()->references('id')->on('payment_transactions')->onDelete('cascade');
-            $table->enum('type', ['Full Payment', 'Installment Payment']);
-            $table->foreignId('installment_id')->nullable()->references('id')->on('fees_installments')->onDelete('restrict');
-            $table->enum('mode', ['Cash', 'Cheque', 'Online']);
-            $table->string('cheque_no')->nullable();
-            $table->double('amount', 8, 2);
-            $table->double('due_charges', 8, 2)->nullable();
-            $table->foreignId('fees_paid_id')->nullable()->references('id')->on('fees_paids')->onDelete('cascade');
-            $table->enum('status', ['Success', 'Pending', 'Failed']);
-            $table->date('date');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('compulsory_fees', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('student_id')->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->foreignId('payment_transaction_id')->nullable()->references('id')->on('payment_transactions')->onDelete('cascade');
+                $table->enum('type', ['Full Payment', 'Installment Payment']);
+                $table->foreignId('installment_id')->nullable()->references('id')->on('fees_installments')->onDelete('restrict');
+                $table->enum('mode', ['Cash', 'Cheque', 'Online']);
+                $table->string('cheque_no')->nullable();
+                $table->double('amount', 8, 2);
+                $table->double('due_charges', 8, 2)->nullable();
+                $table->foreignId('fees_paid_id')->nullable()->references('id')->on('fees_paids')->onDelete('cascade');
+                $table->enum('status', ['Success', 'Pending', 'Failed']);
+                $table->date('date');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('optional_fees', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
-            $table->foreignId('payment_transaction_id')->nullable()->references('id')->on('payment_transactions')->onDelete('cascade');
-            $table->foreignId('fees_class_id')->nullable()->references('id')->on('fees_class_types')->onDelete('restrict');
-            $table->enum('mode', ['Cash', 'Cheque', 'Online']);
-            $table->string('cheque_no')->nullable();
-            $table->double('amount', 8, 2);
-            $table->foreignId('fees_paid_id')->nullable()->references('id')->on('fees_paids')->onDelete('cascade');
-            $table->date('date');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->enum('status', ['Success', 'Pending', 'Failed']);
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('optional_fees', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('student_id')->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->foreignId('class_id')->references('id')->on('classes')->onDelete('cascade');
+                $table->foreignId('payment_transaction_id')->nullable()->references('id')->on('payment_transactions')->onDelete('cascade');
+                $table->foreignId('fees_class_id')->nullable()->references('id')->on('fees_class_types')->onDelete('restrict');
+                $table->enum('mode', ['Cash', 'Cheque', 'Online']);
+                $table->string('cheque_no')->nullable();
+                $table->double('amount', 8, 2);
+                $table->foreignId('fees_paid_id')->nullable()->references('id')->on('fees_paids')->onDelete('cascade');
+                $table->date('date');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->enum('status', ['Success', 'Pending', 'Failed']);
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('payment_configurations', static function (Blueprint $table) {
-            $table->id();
-            $table->string('payment_method');
-            $table->string('api_key');
-            $table->string('secret_key');
-            $table->string('webhook_secret_key');
-            $table->string('currency_code', 128)->nullable();
-            $table->boolean('status')->comment('0 - Disabled, 1 - Enabled')->default(1);
-            $table->foreignId('school_id')->nullable()->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('payment_configurations', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->string('payment_method');
+                $table->string('api_key');
+                $table->string('secret_key');
+                $table->string('webhook_secret_key');
+                $table->string('currency_code', 128)->nullable();
+                $table->boolean('status')->comment('0 - Disabled, 1 - Enabled')->default(1);
+                $table->foreignId('school_id')->nullable()->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('expenses', static function (Blueprint $table) {
-            $table->bigInteger('basic_salary')->default(0)->after('staff_id');
-            $table->float('paid_leaves')->default(0)->after('basic_salary');
-        });
+        try {
+            Schema::table('expenses', static function (Blueprint $table) {
+                $table->bigInteger('basic_salary')->default(0)->after('staff_id');
+                $table->float('paid_leaves')->default(0)->after('basic_salary');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('packages', static function (Blueprint $table) {
-            $table->integer('is_trial')->default(0)->after('status');
-        });
+        try {
+            Schema::table('packages', static function (Blueprint $table) {
+                $table->integer('is_trial')->default(0)->after('status');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('leave_masters', static function (Blueprint $table) {
-            $table->id();
-            $table->float('leaves')->comment('Leaves per month');
-            $table->string('holiday');
-            $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('leave_masters', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->float('leaves')->comment('Leaves per month');
+                $table->string('holiday');
+                $table->foreignId('session_year_id')->references('id')->on('session_years')->onDelete('cascade');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
 
-        Schema::create('leaves', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->string('reason');
-            $table->date('from_date');
-            $table->date('to_date');
-            $table->integer('status')->default(0)->comment('0 => Pending, 1 => Approved, 2 => Rejected');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->foreignId('leave_master_id')->references('id')->on('leave_masters')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('leaves', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->string('reason');
+                $table->date('from_date');
+                $table->date('to_date');
+                $table->integer('status')->default(0)->comment('0 => Pending, 1 => Approved, 2 => Rejected');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->foreignId('leave_master_id')->references('id')->on('leave_masters')->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('leave_details', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('leave_id')->references('id')->on('leaves')->onDelete('cascade');
-            $table->date('date');
-            $table->string('type');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('leave_details', static function (Blueprint $table) use ($schoolsTable) {
+                $table->id();
+                $table->foreignId('leave_id')->references('id')->on('leaves')->onDelete('cascade');
+                $table->date('date');
+                $table->string('type');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('subscriptions', static function (Blueprint $table) {
-            $table->dropForeign(['school_id']);
-        });
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) {
+                $table->dropForeign(['school_id']);
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('subscriptions', static function (Blueprint $table) {
-            $table->dropUnique('subscription');
-            $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
-        });
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) use ($schoolsTable) {
+                $table->dropUnique('subscription');
+                $table->foreign('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('addon_subscriptions', static function (Blueprint $table) {
-            $table->dropForeign(['school_id']);
-            $table->dropForeign(['feature_id']);
-        });
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) {
+                $table->dropForeign(['school_id']);
+                $table->dropForeign(['feature_id']);
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('addon_subscriptions', static function (Blueprint $table) {
-            $table->dropUnique('addon_subscription');
-            $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->foreign('feature_id')->references('id')->on('features')->onDelete('cascade');
-            $table->softDeletes();
-        });
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) use ($schoolsTable) {
+                $table->dropUnique('addon_subscription');
+                $table->foreign('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->foreign('feature_id')->references('id')->on('features')->onDelete('cascade');
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('user_status_for_next_cycles', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->integer('status');
-            $table->foreignId('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->unique('user_id');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('user_status_for_next_cycles', static function (Blueprint $table) use ($usersTable, $schoolsTable) {
+                $table->id();
+                $table->foreignId('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->integer('status');
+                $table->foreignId('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->unique('user_id');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('payment_transactions', static function (Blueprint $table) {
-            $table->string('payment_gateway')->change();
-            $table->enum('payment_status', [0, 1, 2, 'failed', 'succeed', 'pending'])->change();
-        });
+        try {
+            Schema::table('payment_transactions', static function (Blueprint $table) {
+                $table->string('payment_gateway')->change();
+                $table->enum('payment_status', [0, 1, 2, 'failed', 'succeed', 'pending'])->change();
+            });
+        } catch (\Exception $e) {}
 
 
         // Update payment transaction table
@@ -245,15 +287,19 @@ return new class extends Migration {
             }
         }
 
-        Schema::table('payment_transactions', static function (Blueprint $table) {
-            $table->enum('payment_status', ['failed', 'succeed', 'pending'])->change();
-        });
+        try {
+            Schema::table('payment_transactions', static function (Blueprint $table) {
+                $table->enum('payment_status', ['failed', 'succeed', 'pending'])->change();
+            });
+        } catch (\Exception $e) {}
 
 
         // Subscription bill calculation based on days usage
-        Schema::table('subscriptions', static function (Blueprint $table) {
-            $table->integer('billing_cycle')->default(0)->after('end_date');
-        });
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) {
+                $table->integer('billing_cycle')->default(0)->after('end_date');
+            });
+        } catch (\Exception $e) {}
 
         $subscriptions = Subscription::get();
         if (count($subscriptions) !== 0) {
@@ -266,26 +312,32 @@ return new class extends Migration {
         }
 
 
-        Schema::create('guidances', static function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100)->nullable(true);
-            $table->text('link')->nullable(true);
-        });
+        try {
+            Schema::create('guidances', static function (Blueprint $table) {
+                $table->id();
+                $table->string('name', 100)->nullable(true);
+                $table->text('link')->nullable(true);
+            });
+        } catch (\Exception $e) {}
 
-        Schema::create('fees_advance', static function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('compulsory_fee_id')->references('id')->on('compulsory_fees')->onDelete('cascade');
-            $table->foreignId('student_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreignId('parent_id')->comment('user_id')->references('id')->on('users')->onDelete('cascade');
-            $table->float('amount');
-            $table->timestamps();
-        });
+        try {
+            Schema::create('fees_advance', static function (Blueprint $table) use ($usersTable) {
+                $table->id();
+                $table->foreignId('compulsory_fee_id')->references('id')->on('compulsory_fees')->onDelete('cascade');
+                $table->foreignId('student_id')->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->foreignId('parent_id')->comment('user_id')->references('id')->on($usersTable)->onDelete('cascade');
+                $table->float('amount');
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
     }
 
     /**
      * Reverse the migrations.
      */
     public function down(): void {
+        $schoolsTable = 'schools';
+        $usersTable = 'users';
         Schema::disableForeignKeyConstraints();
         Schema::dropIfExists('fees');
         Schema::dropIfExists('fees_types');
@@ -298,35 +350,55 @@ return new class extends Migration {
         Schema::dropIfExists('payment_configurations');
 
         Schema::dropIfExists('leave_details');
-        Schema::table('expenses', static function (Blueprint $table) {
-            $table->dropColumn('basic_salary');
-            $table->dropColumn('paid_leaves');
-        });
-        Schema::table('packages', static function (Blueprint $table) {
-            $table->dropColumn('is_trial');
-        });
+        try {
+            Schema::table('expenses', static function (Blueprint $table) {
+                $table->dropColumn('basic_salary');
+                $table->dropColumn('paid_leaves');
+            });
+        } catch (\Exception $e) {}
+        try {
+            Schema::table('packages', static function (Blueprint $table) {
+                $table->dropColumn('is_trial');
+            });
+        } catch (\Exception $e) {}
         Schema::dropIfExists('leave_masters');
 
-        Schema::table('subscriptions', static function (Blueprint $table) {
-            $table->dropForeign(['school_id']);
-            $table->unique(['school_id', 'start_date'], 'subscription');
-            $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
-        });
-        Schema::table('addon_subscriptions', static function (Blueprint $table) {
-            $table->dropForeign(['school_id']);
-            $table->dropForeign(['feature_id']);
-            $table->unique(['school_id', 'feature_id', 'end_date'], 'addon_subscription');
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) {
+                $table->dropForeign(['school_id']);
+            });
+        } catch (\Exception $e) {}
 
-            $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
-            $table->foreign('feature_id')->references('id')->on('features')->onDelete('cascade');
-            $table->dropColumn('deleted_at');
-        });
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) use ($schoolsTable) {
+                $table->unique(['school_id', 'start_date'], 'subscription');
+                $table->foreign('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+            });
+        } catch (\Exception $e) {}
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) {
+                $table->dropForeign(['school_id']);
+                $table->dropForeign(['feature_id']);
+            });
+        } catch (\Exception $e) {}
+
+        try {
+            Schema::table('addon_subscriptions', static function (Blueprint $table) use ($schoolsTable) {
+                $table->unique(['school_id', 'feature_id', 'end_date'], 'addon_subscription');
+
+                $table->foreign('school_id')->references('id')->on($schoolsTable)->onDelete('cascade');
+                $table->foreign('feature_id')->references('id')->on('features')->onDelete('cascade');
+                $table->dropColumn('deleted_at');
+            });
+        } catch (\Exception $e) {}
 
         Schema::dropIfExists('user_status_for_next_cycles');
 
-        Schema::table('subscriptions', static function (Blueprint $table) {
-            $table->dropColumn('billing_cycle');
-        });
+        try {
+            Schema::table('subscriptions', static function (Blueprint $table) {
+                $table->dropColumn('billing_cycle');
+            });
+        } catch (\Exception $e) {}
 
         Schema::dropIfExists('fees_advance');
         Schema::dropIfExists('guidances');

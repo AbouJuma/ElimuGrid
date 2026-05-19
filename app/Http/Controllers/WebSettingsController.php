@@ -172,7 +172,7 @@ class WebSettingsController extends Controller
         }
         
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $feature_section_data = [
                 'title' => $request->title,
                 'heading' => $request->heading,
@@ -189,10 +189,10 @@ class WebSettingsController extends Controller
                 ];
             }
             $this->featureSectionList->createBulk($data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();
         }
@@ -270,7 +270,7 @@ class WebSettingsController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $feature_section_data = [
                 'title' => $request->title,
                 'heading' => $request->heading,
@@ -338,11 +338,11 @@ class WebSettingsController extends Controller
             $this->featureSectionList->upsert($data_with_image, ['id'], ['feature_section_id', 'feature', 'description', 'image']);
             $this->featureSectionList->upsert($data_without_image, ['id'], ['feature_section_id', 'feature', 'description']);
     
-            DB::commit();
+            DB::connection('mysql')->commit();
     
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();
         }
@@ -373,7 +373,7 @@ class WebSettingsController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $ids = json_decode($request->ids, false, 512, JSON_THROW_ON_ERROR);
             $update = [];
             foreach ($ids as $key => $id) {
@@ -383,10 +383,10 @@ class WebSettingsController extends Controller
                 ];
             }
             $this->featureSection->upsert($update, ['id'], ['rank']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Rank Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'WebSettings Controller -> Change Rank method');
             ResponseService::errorResponse();
         }
@@ -402,7 +402,7 @@ class WebSettingsController extends Controller
 
             return view('school-settings.web-page.index',compact('settings'));
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'WebSettings Controller -> School index  method');
             ResponseService::errorResponse();
         }
@@ -494,7 +494,7 @@ class WebSettingsController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = array();
             foreach ($settings as $key => $rule) {
                 $images = ['about_us_image', 'counter_teacher','counter_student', 'counter_class', 'counter_stream', 'announcement_image','our_mission_image','footer_logo', 'online_registration_image'];
@@ -527,7 +527,7 @@ class WebSettingsController extends Controller
             $this->schoolSettings->upsert($data, ["name"], ["data"]);
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $th) {
             ResponseService::logErrorResponse($th);

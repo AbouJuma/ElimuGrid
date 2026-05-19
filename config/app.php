@@ -58,6 +58,10 @@ return [
 
     'asset_url' => env('ASSET_URL', null),
 
+    'demo_mode' => env('DEMO_MODE', false),
+
+    'app_lang' => env('APPLANG', 'en'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
@@ -204,5 +208,8 @@ return [
         'Image' => \Intervention\Image\Facades\Image::class,
         'PDF'   => Barryvdh\DomPDF\Facade::class,
     ])->toArray(),
+
+    'app_lang' => env('APPLANG', 'en'),
+    'demo_mode' => env('DEMO_MODE', false),
 
 ];

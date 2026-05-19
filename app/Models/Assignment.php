@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use App\Models\SessionYearsTracking;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\TenantModel;
 
 /**
  * @mixin Builder
  */
 class Assignment extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'class_section_id',

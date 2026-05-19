@@ -5,7 +5,7 @@ namespace dacoto\LaravelWizardInstaller\Middleware;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Config;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
@@ -26,11 +26,8 @@ class ToInstallMiddleware
         try {
             $school_database_name = Session::get('school_database_name');
             if ($school_database_name) {
-                Config::set('database.connections.school.database', $school_database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database_name);
                 DB::setDefaultConnection('school');
-
             }
         } catch (\Throwable $th) {
 

@@ -27,7 +27,7 @@ class PaystackController extends Controller
         curl_setopt($ch,CURLOPT_POST, true);
         curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            "Authorization: Bearer " . env('PAYSTACK_SECRET_KEY'),
+            "Authorization: Bearer " . config('paystack.secretKey'),
             "Cache-Control: no-cache",
         ));
         
@@ -93,7 +93,7 @@ class PaystackController extends Controller
         curl_setopt($ch,CURLOPT_POST, true);
         curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-            "Authorization: Bearer " . env('PAYSTACK_SECRET_KEY'),
+            "Authorization: Bearer " . config('paystack.secretKey'),
             "Cache-Control: no-cache",
         ));
         
@@ -111,7 +111,7 @@ class PaystackController extends Controller
         $reference = $request->query('reference'); // Paystack transaction reference
 
         $client = new Client();
-        $secretKey = env('PAYSTACK_SECRET_KEY'); // Secret key from .env
+        $secretKey = config('paystack.secretKey'); // Secret key from config
 
         try {
             $response = $client->get('https://api.paystack.co/transaction/verify/' . $reference, [

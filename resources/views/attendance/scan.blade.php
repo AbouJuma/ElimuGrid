@@ -178,8 +178,14 @@ function processScan() {
         },
         error: function(xhr) {
             console.log('Error:', xhr);
+            var msg = 'Error occurred';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                msg = xhr.responseJSON.message;
+            } else if (xhr.statusText) {
+                msg = 'Error: ' + xhr.statusText;
+            }
             document.getElementById('scanStatus').className = 'mt-2 badge badge-danger';
-            document.getElementById('scanStatus').innerText = 'Error occurred';
+            document.getElementById('scanStatus').innerText = msg;
         }
     });
 }

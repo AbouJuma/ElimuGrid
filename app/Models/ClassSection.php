@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
+
 class ClassSection extends Model {
-    use SoftDeletes;
-    use HasFactory;
+    use SoftDeletes, HasFactory, TenantModel;
 
     protected $fillable = ['class_id', 'section_id', 'class_teacher_id', 'school_id', 'medium_id'];
     protected $appends = ['name', 'full_name'];

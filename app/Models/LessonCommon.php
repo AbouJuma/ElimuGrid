@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\TenantModel;
 
 class LessonCommon extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'lesson_id',

@@ -5,10 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-
+use App\Traits\TenantModel;
 
 class AssignmentSubmission extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'assignment_id',

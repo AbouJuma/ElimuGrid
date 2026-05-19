@@ -12,10 +12,10 @@ use App\Models\SubscriptionFeature;
 use App\Models\User;
 use App\Models\UserStatusForNextCycle;
 use App\Services\CachingService;
+use App\Services\SharedHostingTenantService;
 use App\Services\SubscriptionService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Log;
 use Symfony\Component\Console\Command\Command as CommandAlias;
@@ -197,10 +197,7 @@ class SubscriptionBillCron extends Command
         $yesterday_date = Carbon::yesterday()->toDateTimeString();
         foreach ($subscriptions as $key => $subscription) {
 
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $subscription->school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($subscription->school->database_name);
             DB::setDefaultConnection('school');
 
             $user_status = UserStatusForNextCycle::where('school_id',$subscription->school_id)->get();

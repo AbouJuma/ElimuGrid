@@ -38,6 +38,7 @@ use App\Rules\uniqueLessonInClass;
 use App\Rules\uniqueTopicInLesson;
 use App\Services\CachingService;
 use App\Services\ResponseService;
+use App\Services\SharedHostingTenantService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -49,7 +50,6 @@ use Throwable;
 use App\Rules\YouTubeUrl;
 use App\Rules\DynamicMimes;
 use App\Rules\MaxFileSize;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Hash;
 use PDF;
 use Str;
@@ -136,10 +136,7 @@ class TeacherApiController extends Controller
         $school = School::on('mysql')->where('code',$request->school_code)->first();
 
         if ($school) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
         } else {
             // return response()->json(['message' => 'Invalid school code'], 400);
@@ -152,7 +149,7 @@ class TeacherApiController extends Controller
 
         // Check if the user has the 'Teacher' role or 'Staff' role
         if ($user && !$user->hasRole('School Admin')) {
-            if ($user->hasRole('Student') || $user->hasRole('Parent') || $user->hasRole('Guardian') ) {
+            if ($user->hasRole('Student') || $user->hasRole('Guardian')) {
                 return ResponseService::errorResponse('You must have a teacher / Staff role to log in.');
             }
         }   
@@ -318,7 +315,7 @@ class TeacherApiController extends Controller
         }
         try {
             
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
 
             $assignmentData = array(
@@ -410,16 +407,16 @@ class TeacherApiController extends Controller
 
             send_notification($user, $title, $body, $type);
             // DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -447,7 +444,7 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // $sessionYearId = getSchoolSettings('session_year');
             $sessionYear = $this->cache->getDefaultSessionYear();
@@ -524,16 +521,16 @@ class TeacherApiController extends Controller
             $assignment->save();
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -545,9 +542,9 @@ class TeacherApiController extends Controller
         ResponseService::noFeatureThenSendJson('Assignment Management');
         ResponseService::noPermissionThenSendJson('assignment-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->assignment->deleteById($request->assignment_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -590,7 +587,7 @@ class TeacherApiController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $updateAssignmentSubmissionData = array(
                 'feedback' => $request->feedback,
                 'points'   => $request->status == 1 ? $request->points : NULL,
@@ -614,16 +611,16 @@ class TeacherApiController extends Controller
             $user = array_merge($student_id, $guardian_id);
 
             send_notification($user, $title, $body, $type);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -726,7 +723,7 @@ class TeacherApiController extends Controller
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
 
@@ -784,16 +781,16 @@ class TeacherApiController extends Controller
            
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -838,7 +835,7 @@ class TeacherApiController extends Controller
             ResponseService::errorResponse($validator2->errors()->first(), null, config('constants.RESPONSE_CODE.NOT_UNIQUE_IN_CLASS'));
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             
             $lessonData = [];
             
@@ -926,16 +923,16 @@ class TeacherApiController extends Controller
            
             send_notification($user, $title, $body, $type);
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -952,9 +949,9 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->lesson->deleteById($request->lesson_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable) {
             ResponseService::errorResponse();
@@ -1038,7 +1035,7 @@ class TeacherApiController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
 
@@ -1099,16 +1096,16 @@ class TeacherApiController extends Controller
            
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -1151,7 +1148,7 @@ class TeacherApiController extends Controller
             ResponseService::errorResponse($validator2->errors()->first(), null, config('constants.RESPONSE_CODE.NOT_UNIQUE_IN_CLASS'));
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $topic = $this->topic->update($request->topic_id, $request->all());
 
             //Add the new Files
@@ -1228,16 +1225,16 @@ class TeacherApiController extends Controller
            
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -1249,12 +1246,12 @@ class TeacherApiController extends Controller
         ResponseService::noFeatureThenSendJson('Lesson Management');
         ResponseService::noPermissionThenSendJson('topic-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->topic->deleteById($request->topic_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -1364,12 +1361,12 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->files->deleteById($request->file_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -1397,7 +1394,7 @@ class TeacherApiController extends Controller
                 // $classSection = $this->classSection->builder()->where('id', $section_id)->with('class')->first();
                 // $classSubjects = $this->classSubject->builder()->where('class_id', $classSection->class->id)->where('subject_id', $request->subject_id)->first();
                 $sql = $sql->with('class_subjects')->whereHas('announcement_class', function ($q) use ($request) {
-                    $q->where('class_subjects.subject_id', $request->subject_id);
+                    $q->where('subject_id', $request->subject_id);
                 });
                 // $sql = $sql->whereHas('announcement_class', function ($q) use ($request) {
                 //     $q->where('class_subject_id', $request->class_subject_id);
@@ -1442,7 +1439,7 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear(); // Get Current Session Year
             // Custom Announcement Array to Store Data
             $announcementData = array(
@@ -1555,16 +1552,16 @@ class TeacherApiController extends Controller
                 send_notification($notifyUser, $title, $body, $type); // Send Notification
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -1586,7 +1583,7 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear(); // Get Current Session Year
 
             // Custom Announcement Array to Store Data
@@ -1714,16 +1711,16 @@ class TeacherApiController extends Controller
                 // send_notification($notifyUser, $title, $body, $type); // Send Notification
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -1739,9 +1736,9 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->announcement->deleteById($request->announcement_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -1812,7 +1809,7 @@ class TeacherApiController extends Controller
             ResponseService::validationError();
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $date = date('Y-m-d', strtotime($request->date));
             $student_ids = array();
@@ -1870,16 +1867,16 @@ class TeacherApiController extends Controller
                 }
             }
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -2074,7 +2071,7 @@ class TeacherApiController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $exam_published = $this->exam->builder()->where('id', $request->exam_id)->first();
             if (isset($exam_published) && $exam_published->publish == 1) {
                 ResponseService::errorResponse('exam_published', null, config('constants.RESPONSE_CODE.EXAM_ALREADY_PUBLISHED'));
@@ -2135,7 +2132,7 @@ class TeacherApiController extends Controller
                 if (isset($exam_result_marks)) {
                     $this->examMarks->createBulk($exam_result_marks);
                 }
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse('Data Stored Successfully');
             }
         } catch (Throwable $e) {
@@ -2156,7 +2153,7 @@ class TeacherApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $exam_published = $this->exam->findById($request->exam_id);
             if (isset($exam_published) && $exam_published->publish == 1) {
 
@@ -2219,7 +2216,7 @@ class TeacherApiController extends Controller
                     $this->examMarks->createBulk($exam_result_marks);
                 }
 
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse('Data Stored Successfully');
             }
         } catch (Throwable $e) {

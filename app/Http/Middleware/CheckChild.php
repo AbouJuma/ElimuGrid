@@ -9,9 +9,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use App\Services\SharedHostingTenantService;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class CheckChild {
@@ -31,10 +31,7 @@ class CheckChild {
                 $school = School::on('mysql')->where('code',$schoolCode)->first();
 
                 if ($school) {
-                    DB::setDefaultConnection('school');
-                    Config::set('database.connections.school.database', $school->database_name);
-                    DB::purge('school');
-                    DB::connection('school')->reconnect();
+                    SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                     DB::setDefaultConnection('school');
                     $token = $request->bearerToken();
                     $user = PersonalAccessToken::findToken($token);
@@ -53,13 +50,10 @@ class CheckChild {
             // For web routes
             $school_database_name = Session::get('school_database_name');
             if ($school_database_name) {
-                DB::setDefaultConnection('school');
-                Config::set('database.connections.school.database', $school_database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database_name);
                 DB::setDefaultConnection('school');
             } else {
-                DB::purge('school');
+                SharedHostingTenantService::resetSchoolDatabaseConnection();
                 DB::connection('mysql')->reconnect();
                 DB::setDefaultConnection('mysql');
             }

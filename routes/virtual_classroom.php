@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::group(['middleware' => ['auth', 'feature_check:Virtual Classroom']], function () {
+Route::group(['middleware' => ['auth', 'customAuth', 'feature_check:Virtual Classroom']], function () {
     // Main resource routes
     Route::get('virtual-classroom', [VirtualClassroomController::class, 'index'])
         ->name('virtual-classroom.index');

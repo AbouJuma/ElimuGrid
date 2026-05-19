@@ -6,6 +6,8 @@ use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
+use Illuminate\Support\Facades\Schema;
+
 class uniqueForSchool implements Rule {
     /**
      * @var array|mixed
@@ -44,7 +46,19 @@ class uniqueForSchool implements Rule {
     public function passes($attribute, $value) {
         $columns = $this->column ?? $attribute;
 
-        $query = DB::table($this->table);
+        $tableName = $this->table;
+
+        // Use tenant-prefixed connection and table if available
+        if (config('tenant.current_school_id')) {
+            $schoolId = config('tenant.current_school_id');
+            $prefix = 's' . $schoolId . '_';
+            if (!str_starts_with($tableName, $prefix)) {
+                $tableName = $prefix . $tableName;
+            }
+            $query = DB::connection('school')->table($tableName);
+        } else {
+            $query = DB::table($tableName);
+        }
 
         if (!is_array($columns)) {
             $query = $query->where($columns, $value);
@@ -56,11 +70,14 @@ class uniqueForSchool implements Rule {
             $query = $query->whereNot('id', $this->ignoreID);
         }
 
-        // Check for School ID
-        if (!empty($this->schoolID)) {
-            $query = $query->where('school_id', $this->schoolID);
-        } else {
-            $query = $query->where('school_id', Auth::user()->school_id);
+        // Check for School ID if the column exists in the table
+        $connection = config('tenant.current_school_id') ? 'school' : config('database.default');
+        if (Schema::connection($connection)->hasColumn($tableName, 'school_id')) {
+            if (!empty($this->schoolID)) {
+                $query = $query->where('school_id', $this->schoolID);
+            } elseif (Auth::check() && Auth::user()->school_id) {
+                $query = $query->where('school_id', Auth::user()->school_id);
+            }
         }
         return !$query->exists();
     }

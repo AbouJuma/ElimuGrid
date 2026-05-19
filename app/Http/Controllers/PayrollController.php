@@ -85,7 +85,7 @@ class PayrollController extends Controller {
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $user_ids = explode(",",$request->user_id);
             
             $selectedMonth = $request->month;
@@ -147,14 +147,14 @@ class PayrollController extends Controller {
 
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), ['does not exist', 'file_get_contents'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not sent.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, 'Payroll Controller -> Store method');
                 ResponseService::errorResponse();
             }
@@ -385,12 +385,40 @@ class PayrollController extends Controller {
         ResponseService::noFeatureThenRedirect('Expense Management');
         try {
             $schoolSetting = $this->cache->getSchoolSettings();
-            $data = explode("storage/", $schoolSetting['horizontal_logo'] ?? '');
+            if ($schoolSetting instanceof \Illuminate\Support\Collection) {
+                $schoolSetting = $schoolSetting->toArray();
+            }
+            if (!is_array($schoolSetting)) {
+                $schoolSetting = [];
+            }
+
+            $systemSettings = $this->cache->getSystemSettings();
+
+            if (empty($schoolSetting['school_name'])) {
+                $schoolSetting['school_name'] = $systemSettings['school_name'] ?? ($systemSettings['system_name'] ?? 'elimuGrid');
+            }
+            if (empty($schoolSetting['school_address'])) {
+                $schoolSetting['school_address'] = $systemSettings['address'] ?? '';
+            }
+
+            // Fetch school model to prioritize the specific school's uploaded logo
+            $schoolId = \App\Services\CachingService::resolveEffectiveSchoolId();
+            $school = \App\Models\School::find($schoolId);
+
+            if ($school) {
+                $rawLogo = $school->getRawOriginal('logo');
+                if (!empty($rawLogo) && $rawLogo !== 'no_image_available.jpg') {
+                    $schoolSetting['horizontal_logo'] = $rawLogo;
+                }
+            }
+
+            $horizontalLogo = $schoolSetting['horizontal_logo'] ?? '';
+            $data = explode("storage/", $horizontalLogo);
             $schoolSetting['horizontal_logo'] = end($data);
 
-            if ($schoolSetting['horizontal_logo'] == null) {
-                $systemSettings = $this->cache->getSystemSettings();
-                $data = explode("storage/", $systemSettings['horizontal_logo'] ?? '');
+            if (empty($schoolSetting['horizontal_logo'])) {
+                $systemLogo = $systemSettings['horizontal_logo'] ?? '';
+                $data = explode("storage/", $systemLogo);
                 $schoolSetting['horizontal_logo'] = end($data);
             }
 

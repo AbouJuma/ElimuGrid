@@ -128,7 +128,7 @@ class FeesController extends Controller
                 }
             }
             
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $classes = $this->class->builder()->whereIn("id", $request->class_id)->with('stream', 'medium')->get();
 
@@ -214,16 +214,16 @@ class FeesController extends Controller
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Fees', $fees->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "FeesController -> Store Method");
                 ResponseService::errorResponse();
             }
@@ -329,7 +329,7 @@ class FeesController extends Controller
             'fees_installments.*.due_charges'     => 'required|numeric'
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
 
             // Fees Data Store
@@ -387,10 +387,10 @@ class FeesController extends Controller
                 $this->feesInstallment->upsert($installmentData, ['id'], ['name', 'due_date', 'due_charges', 'due_charges_type', 'fees_id', 'session_year_id']);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successRedirectResponse(route('fees.index'), 'Data Update Successfully');
         } catch (Throwable) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::errorRedirectResponse();
         }
     }
@@ -400,14 +400,14 @@ class FeesController extends Controller
         ResponseService::noFeatureThenRedirect('Fees Management');
         ResponseService::noPermissionThenSendJson('fees-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->fees->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Fees', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "FeesController -> Store Method");
             ResponseService::errorResponse();
         }
@@ -457,14 +457,14 @@ class FeesController extends Controller
     {
         ResponseService::noFeatureThenRedirect('Fees Management');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->feesInstallment->DeleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\FeesInstallment', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -474,14 +474,14 @@ class FeesController extends Controller
     {
         ResponseService::noFeatureThenRedirect('Fees Management');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->feesClassType->DeleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\FeesClassType', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -492,7 +492,7 @@ class FeesController extends Controller
         ResponseService::noFeatureThenRedirect('Fees Management');
         ResponseService::noPermissionThenRedirect('fees-paid');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Get Fees Paid ID and Amount of Fees Transaction Table
             $optionalFeeData = $this->optionalFee->findById($id);
@@ -519,10 +519,10 @@ class FeesController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OptionalFee', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -533,7 +533,7 @@ class FeesController extends Controller
         ResponseService::noFeatureThenRedirect('Fees Management');
         ResponseService::noPermissionThenRedirect('fees-paid');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Get Fees Paid ID and Amount of Fees Transaction Table
             $installmentFeeTransaction = $this->compulsoryFee->findById($compulsoryFeesPaidID);
@@ -560,10 +560,10 @@ class FeesController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\CompulsoryFee', $compulsoryFeesPaidID, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -1038,7 +1038,7 @@ class FeesController extends Controller
 
         
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $fees = $this->fees->findById($request->fees_id, ['*'], ['fees_class_type.fees_type:id,name', 'installments:id,name,due_date,due_charges,fees_id']);
             //            if (count($fees->installments) > 0) {
             //                collect($fees->installments)->map(function ($data) use ($fees) {
@@ -1144,10 +1144,10 @@ class FeesController extends Controller
                 ]);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated SuccessFully");
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'FeesController -> compulsoryFeesPaidStore method ');
             ResponseService::errorResponse();
         }
@@ -1198,7 +1198,7 @@ class FeesController extends Controller
             'student_id' => 'required|numeric',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // First Store in Fees Paid table to get Fees Paid ID
             $feesPaid = $this->feesPaid->builder()->where([
@@ -1251,10 +1251,10 @@ class FeesController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\OptionalFee', $optionalFeesPaymentData['fees_paid_id'], Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated SuccessFully");
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'FeesController -> compulsoryFeesPaidStore method ');
             ResponseService::errorResponse();
         }
@@ -1326,10 +1326,10 @@ class FeesController extends Controller
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, 'FeesController -> feesOverDue method ');
                 ResponseService::errorResponse();
             }
@@ -1350,7 +1350,7 @@ class FeesController extends Controller
 
             ResponseService::successResponse("Students Deactived Account Successfully.");
         } catch (\Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, 'FeesController -> studentAccountDeactivate method ');
             ResponseService::errorResponse();
         }

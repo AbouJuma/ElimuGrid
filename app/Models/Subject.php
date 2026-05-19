@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 
+use App\Traits\TenantModel;
+
+
 class Subject extends Model {
-    use SoftDeletes;
+    use SoftDeletes, TenantModel;
     use HasFactory;
 
     protected $fillable = [
@@ -30,6 +33,10 @@ class Subject extends Model {
     }
 
     public function class_subjects() {
+        return $this->hasMany(ClassSubject::class);
+    }
+
+    public function class_subject() {
         return $this->hasMany(ClassSubject::class);
     }
 

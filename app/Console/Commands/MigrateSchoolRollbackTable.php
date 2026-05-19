@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\School;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 class MigrateSchoolRollbackTable extends Command
@@ -33,9 +33,7 @@ class MigrateSchoolRollbackTable extends Command
         $schools = School::withTrashed()->get();
 
         foreach ($schools as $key => $school) {
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
 
             Artisan::call('migrate:rollback', [

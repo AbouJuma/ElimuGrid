@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
+
 class Section extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, TenantModel;
     use HasFactory;
 
     protected $fillable = ['name', 'school_id'];
@@ -19,6 +22,11 @@ class Section extends Model
     public function classes()
     {
         return $this->belongsToMany(ClassSchool::class, 'class_sections', 'section_id', 'class_id')->withTrashed();
+    }
+
+    public function class_sections()
+    {
+        return $this->hasMany(ClassSection::class, 'section_id');
     }
 
     public function scopeOwner($query)

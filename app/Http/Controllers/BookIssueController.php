@@ -44,7 +44,7 @@ class BookIssueController extends Controller
         ResponseService::noFeatureThenRedirect('Library Management');
         ResponseService::noPermissionThenRedirect('book-issue-list');
 
-        $classes = $this->classSchool->builder()->orderBy('name', 'ASC')->get();
+        $classes = $this->classSchool->builder()->with(['stream', 'medium'])->orderBy('name', 'ASC')->get();
         $books = $this->book->getAvailableBooks();
 
         return response(view('library.book_issues.index', compact('classes', 'books')));
@@ -61,59 +61,19 @@ class BookIssueController extends Controller
             return response()->json([]);
         }
 
-        // Try multiple approaches to get students by class
-        $students = collect();
-        
-        // Method 1: Direct query through students table (without school_id filter since we're in school DB)
         try {
-            $studentUsers = DB::table('users')
-                ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
-                ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
-                ->join('students', 'users.id', '=', 'students.user_id')
-                ->join('class_sections', 'students.class_section_id', '=', 'class_sections.id')
-                ->where('roles.name', 'Student')
-                ->where('class_sections.class_id', $classId)
-                ->whereNull('users.deleted_at')
-                ->whereNull('students.deleted_at')
-                ->select('users.id', 'users.first_name', 'users.last_name', 'users.email')
+            // Robust Eloquent approach: prefix-safe and Spatie-compatible
+            $students = \App\Models\User::role('Student')
+                ->whereHas('student', function ($query) use ($classId) {
+                    $query->whereHas('class_section', function ($q) use ($classId) {
+                        $q->where('class_id', $classId);
+                    });
+                })
+                ->select('id', 'first_name', 'last_name', 'email')
                 ->get();
-            
-            $students = $studentUsers;
         } catch (\Exception $e) {
-            // Method 2: Use Eloquent relationships
-            try {
-                $students = $this->user->builder()
-                    ->role('Student')
-                    ->whereHas('student', function ($query) use ($classId) {
-                        $query->where('class_id', $classId);
-                    })
-                    ->select('id', 'first_name', 'last_name', 'email')
-                    ->get();
-            } catch (\Exception $e2) {
-                // Method 3: Simple query through class_sections
-                try {
-                    $classSections = DB::table('class_sections')
-                        ->where('class_id', $classId)
-                        ->pluck('id');
-                    
-                    if ($classSections->isNotEmpty()) {
-                        $studentUsers = DB::table('users')
-                            ->join('model_has_roles', 'users.id', '=', 'model_has_roles.model_id')
-                            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
-                            ->join('students', 'users.id', '=', 'students.user_id')
-                            ->where('roles.name', 'Student')
-                            ->whereIn('students.class_section_id', $classSections)
-                            ->whereNull('users.deleted_at')
-                            ->whereNull('students.deleted_at')
-                            ->select('users.id', 'users.first_name', 'users.last_name', 'users.email')
-                            ->get();
-                        
-                        $students = $studentUsers;
-                    }
-                } catch (\Exception $e3) {
-                    \Log::error('Failed to get students by class: ' . $e3->getMessage());
-                }
-            }
+            \Log::error('Failed to get students by class: ' . $e->getMessage());
+            $students = collect();
         }
 
         return response()->json($students->map(function ($student) {
@@ -133,9 +93,9 @@ class BookIssueController extends Controller
         ResponseService::noPermissionThenRedirect('book-issue-create');
 
         $validator = Validator::make($request->all(), [
-            'book_id' => 'required|exists:books,id',
-            'student_id' => 'required|exists:users,id',
-            'class_id' => 'required|exists:class_schools,id',
+            'book_id' => 'required|exists:' . (new \App\Models\Book)->getTable() . ',id',
+            'student_id' => 'required|exists:' . (new \App\Models\User)->getTable() . ',id',
+            'class_id' => 'required|exists:' . (new \App\Models\ClassSchool)->getTable() . ',id',
             'issue_date' => 'required|date',
             'return_date' => 'required|date|after_or_equal:issue_date',
         ]);
@@ -145,7 +105,7 @@ class BookIssueController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('school')->beginTransaction();
 
             $book = $this->book->findById($request->book_id);
             $settings = $this->cache->getSchoolSettings();
@@ -183,10 +143,10 @@ class BookIssueController extends Controller
             $book->available_quantity--;
             $book->save();
 
-            DB::commit();
+            DB::connection('school')->commit();
             ResponseService::successResponse('Book issued successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('school')->rollBack();
             ResponseService::errorResponse('Failed to issue book', null, null, $e);
         }
     }
@@ -200,10 +160,10 @@ class BookIssueController extends Controller
         ResponseService::noPermissionThenRedirect('book-issue-return');
 
         try {
-            DB::beginTransaction();
+            DB::connection('school')->beginTransaction();
 
-            // Get book issue using direct query
-            $bookIssue = DB::table('book_issues')->where('id', $id)->first();
+            // Get book issue using prefix-safe Eloquent
+            $bookIssue = \App\Models\BookIssue::owner()->where('id', $id)->first();
             
             if (!$bookIssue) {
                 return response()->json(['error' => 'Book issue not found'], 404);
@@ -214,35 +174,19 @@ class BookIssueController extends Controller
                 return response()->json(['error' => 'Book is already returned'], 400);
             }
 
-            // Calculate late days and fine
-            $today = now();
-            $returnDate = $bookIssue->return_date;
-            $lateDays = 0;
-            $fineAmount = 0;
+            $finePerDay = 500; // Fine per day
             
-            if ($today->gt($returnDate)) {
-                $lateDays = $today->diffInDays($returnDate);
-                $finePerDay = 500; // Fine per day
-                $fineAmount = $lateDays * $finePerDay;
+            // Mark as returned using prefix-safe model update
+            $bookIssue->markAsReturned($finePerDay);
+
+            // Increase book available quantity using prefix-safe model increment
+            $book = \App\Models\Book::owner()->where('id', $bookIssue->book_id)->first();
+            if ($book) {
+                $book->available_quantity++;
+                $book->save();
             }
-            
-            // Update book issue status with late days and fine
-            DB::table('book_issues')
-                ->where('id', $id)
-                ->update([
-                    'status' => 'returned',
-                    'actual_return_date' => $today,
-                    'late_days' => $lateDays,
-                    'fine_amount' => $fineAmount,
-                    'updated_at' => $today
-                ]);
 
-            // Increase book available quantity
-            DB::table('books')
-                ->where('id', $bookIssue->book_id)
-                ->increment('available_quantity');
-
-            DB::commit();
+            DB::connection('school')->commit();
             
             return response()->json([
                 'message' => 'Book returned successfully',
@@ -250,7 +194,7 @@ class BookIssueController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('school')->rollBack();
             return response()->json(['error' => 'Failed to return book: ' . $e->getMessage()], 500);
         }
     }
@@ -260,43 +204,33 @@ class BookIssueController extends Controller
      */
     public function getBorrowedBooks(Request $request)
     {
-        // Get real data with users and class joins using school database connection
         try {
-            $issues = DB::connection('school')->table('book_issues as bi')
-                ->leftJoin('books as b', 'bi.book_id', '=', 'b.id')
-                ->leftJoin('users as u', 'bi.student_id', '=', 'u.id')
-                ->leftJoin('classes as c', 'bi.class_id', '=', 'c.id')
-                ->select('bi.id', 'bi.class_id', 'bi.student_id', 'bi.book_id', 'bi.issue_date', 'bi.return_date', 'bi.status',
-                        'b.title as book_title', 'b.author as book_author', 'b.isbn as book_isbn',
-                        'u.first_name', 'u.last_name', 'u.email', 'c.name as class_name')
-                ->where('bi.status', 'borrowed')
+            // Retrieve borrowed issues using prefix-safe Eloquent model relationships
+            $issues = \App\Models\BookIssue::owner()
+                ->borrowed()
+                ->with(['book', 'student', 'classSchool'])
                 ->get();
             
-            // Calculate late days in real-time for display
             $carbonToday = \Carbon\Carbon::today();
             $finePerDay = 500;
             
             return response()->json([
                 'total' => $issues->count(),
                 'rows' => $issues->map(function ($issue) use ($carbonToday, $finePerDay) {
-                    // Calculate real-time late days for borrowed books
-                    $returnDate = \Carbon\Carbon::parse($issue->return_date);
-                    $lateDays = 0;
-                    $fineAmount = 0;
-                    if ($carbonToday->gt($returnDate)) {
-                        $lateDays = $carbonToday->diffInDays($returnDate);
-                        $fineAmount = $lateDays * $finePerDay;
-                    }
+                    $lateDays = $issue->calculateLateDays();
+                    $fineAmount = $issue->calculateFineAmount($finePerDay);
+                    
+                    $studentName = $issue->student ? trim($issue->student->first_name . ' ' . $issue->student->last_name) : 'Unknown Student';
                     
                     return [
                         'id' => $issue->id,
-                        'book_title' => $issue->book_title ?? 'Unknown Book',
-                        'book_author' => $issue->book_author ?? 'Unknown Author',
-                        'book_isbn' => $issue->book_isbn ?? '',
-                        'student_name' => trim(($issue->first_name ?? '') . ' ' . ($issue->last_name ?? '')) ?: 'Unknown Student',
-                        'class_name' => $issue->class_name ?? 'Class 1',
-                        'issue_date' => $issue->issue_date,
-                        'return_date' => $issue->return_date,
+                        'book_title' => $issue->book->title ?? 'Unknown Book',
+                        'book_author' => $issue->book->author ?? 'Unknown Author',
+                        'book_isbn' => $issue->book->isbn ?? '',
+                        'student_name' => $studentName,
+                        'class_name' => $issue->classSchool->name ?? 'Class 1',
+                        'issue_date' => $issue->issue_date ? $issue->issue_date->format('Y-m-d') : '',
+                        'return_date' => $issue->return_date ? $issue->return_date->format('Y-m-d') : '',
                         'late_days' => $lateDays,
                         'fine_amount' => number_format($fineAmount, 2),
                         'status' => $issue->status,
@@ -316,47 +250,46 @@ class BookIssueController extends Controller
     public function getReturnedBooks(Request $request)
     {
         try {
-            $query = DB::connection('school')->table('book_issues as bi')
-                ->leftJoin('books as b', 'bi.book_id', '=', 'b.id')
-                ->leftJoin('users as u', 'bi.student_id', '=', 'u.id')
-                ->leftJoin('classes as c', 'bi.class_id', '=', 'c.id')
-                ->select('bi.*', 'b.title as book_title', 'b.author as book_author', 'b.isbn as book_isbn',
-                        'u.first_name', 'u.last_name', 'u.email', 'c.name as class_name')
-                ->where('bi.status', 'returned');
+            // Query returned issues using prefix-safe Eloquent model relationships
+            $query = \App\Models\BookIssue::owner()
+                ->returned()
+                ->with(['book', 'student', 'classSchool']);
 
             // Apply date range filter
             if ($request->has('from_date') && $request->from_date) {
-                $query->whereDate('bi.actual_return_date', '>=', $request->from_date);
+                $query->whereDate('actual_return_date', '>=', $request->from_date);
             }
 
             if ($request->has('to_date') && $request->to_date) {
-                $query->whereDate('bi.actual_return_date', '<=', $request->to_date);
+                $query->whereDate('actual_return_date', '<=', $request->to_date);
             }
 
             // Apply other filters
             if ($request->has('class_id') && $request->class_id) {
-                $query->where('bi.class_id', $request->class_id);
+                $query->where('class_id', $request->class_id);
             }
 
             if ($request->has('student_id') && $request->student_id) {
-                $query->where('bi.student_id', $request->student_id);
+                $query->where('student_id', $request->student_id);
             }
 
-            $issues = $query->orderBy('bi.actual_return_date', 'desc')->get();
+            $issues = $query->orderBy('actual_return_date', 'desc')->get();
 
             return response()->json([
                 'total' => $issues->count(),
                 'rows' => $issues->map(function ($issue) {
+                    $studentName = $issue->student ? trim($issue->student->first_name . ' ' . $issue->student->last_name) : 'Unknown Student';
+
                     return [
                         'id' => $issue->id,
-                        'book_title' => $issue->book_title ?? 'Unknown Book',
-                        'book_author' => $issue->book_author ?? 'Unknown Author',
-                        'book_isbn' => $issue->book_isbn ?? '',
-                        'student_name' => trim(($issue->first_name ?? '') . ' ' . ($issue->last_name ?? '')) ?: 'Unknown Student',
-                        'class_name' => $issue->class_name ?? 'Class 1',
-                        'issue_date' => $issue->issue_date,
-                        'return_date' => $issue->return_date,
-                        'actual_return_date' => $issue->actual_return_date ?? '-',
+                        'book_title' => $issue->book->title ?? 'Unknown Book',
+                        'book_author' => $issue->book->author ?? 'Unknown Author',
+                        'book_isbn' => $issue->book->isbn ?? '',
+                        'student_name' => $studentName,
+                        'class_name' => $issue->classSchool->name ?? 'Class 1',
+                        'issue_date' => $issue->issue_date ? $issue->issue_date->format('Y-m-d') : '',
+                        'return_date' => $issue->return_date ? $issue->return_date->format('Y-m-d') : '',
+                        'actual_return_date' => $issue->actual_return_date ? $issue->actual_return_date->format('Y-m-d') : '-',
                         'late_days' => $issue->late_days ?? 0,
                         'fine_amount' => number_format($issue->fine_amount ?? 0, 2),
                         'status' => 'Returned',
@@ -368,7 +301,7 @@ class BookIssueController extends Controller
         }
     }
 
-    /**0
+    /**
      * Get overdue books (AJAX for Bootstrap Table)
      */
     public function getOverdueBooks(Request $request)
@@ -377,56 +310,47 @@ class BookIssueController extends Controller
             $today = date('Y-m-d');
             
             // Get both 'overdue' status books AND 'borrowed' books past their return date
-            $query = DB::connection('school')->table('book_issues as bi')
-                ->leftJoin('books as b', 'bi.book_id', '=', 'b.id')
-                ->leftJoin('users as u', 'bi.student_id', '=', 'u.id')
-                ->leftJoin('classes as c', 'bi.class_id', '=', 'c.id')
-                ->select('bi.*', 'b.title as book_title', 'b.author as book_author', 'b.isbn as book_isbn',
-                        'u.first_name', 'u.last_name', 'u.email', 'c.name as class_name')
+            $query = \App\Models\BookIssue::owner()
+                ->with(['book', 'student', 'classSchool'])
                 ->where(function($q) use ($today) {
-                    $q->where('bi.status', 'overdue')
+                    $q->where('status', 'overdue')
                       ->orWhere(function($q2) use ($today) {
-                          $q2->where('bi.status', 'borrowed')
-                             ->whereDate('bi.return_date', '<', $today);
+                          $q2->where('status', 'borrowed')
+                             ->whereDate('return_date', '<', $today);
                       });
                 });
 
             // Apply filters
             if ($request->has('class_id') && $request->class_id) {
-                $query->where('bi.class_id', $request->class_id);
+                $query->where('class_id', $request->class_id);
             }
 
             if ($request->has('student_id') && $request->student_id) {
-                $query->where('bi.student_id', $request->student_id);
+                $query->where('student_id', $request->student_id);
             }
 
-            $issues = $query->orderBy('bi.return_date', 'asc')->get();
+            $issues = $query->orderBy('return_date', 'asc')->get();
 
-            // Calculate late days and fines in real-time for display
-            $carbonToday = \Carbon\Carbon::today();
             $finePerDay = 500; // Fine per day
             
             return response()->json([
                 'total' => $issues->count(),
-                'rows' => $issues->map(function ($issue) use ($carbonToday, $finePerDay) {
-                    // Calculate real-time late days
-                    $returnDate = \Carbon\Carbon::parse($issue->return_date);
-                    $lateDays = 0;
-                    if ($carbonToday->gt($returnDate)) {
-                        $lateDays = $carbonToday->diffInDays($returnDate);
-                    }
-                    $fineAmount = $lateDays * $finePerDay;
+                'rows' => $issues->map(function ($issue) use ($finePerDay) {
+                    $lateDays = $issue->calculateLateDays();
+                    $fineAmount = $issue->calculateFineAmount($finePerDay);
                     
+                    $studentName = $issue->student ? trim($issue->student->first_name . ' ' . $issue->student->last_name) : 'Unknown Student';
+
                     return [
                         'id' => $issue->id,
-                        'book_title' => $issue->book_title ?? 'Unknown Book',
-                        'book_author' => $issue->book_author ?? 'Unknown Author',
-                        'book_isbn' => $issue->book_isbn ?? '',
-                        'student_name' => trim(($issue->first_name ?? '') . ' ' . ($issue->last_name ?? '')) ?: 'Unknown Student',
-                        'student_email' => $issue->email ?? '',
-                        'class_name' => $issue->class_name ?? 'Class 1',
-                        'issue_date' => $issue->issue_date,
-                        'return_date' => $issue->return_date,
+                        'book_title' => $issue->book->title ?? 'Unknown Book',
+                        'book_author' => $issue->book->author ?? 'Unknown Author',
+                        'book_isbn' => $issue->book->isbn ?? '',
+                        'student_name' => $studentName,
+                        'student_email' => $issue->student->email ?? '',
+                        'class_name' => $issue->classSchool->name ?? 'Class 1',
+                        'issue_date' => $issue->issue_date ? $issue->issue_date->format('Y-m-d') : '',
+                        'return_date' => $issue->return_date ? $issue->return_date->format('Y-m-d') : '',
                         'late_days' => $lateDays,
                         'fine_amount' => number_format($fineAmount, 2),
                         'status' => 'Overdue',

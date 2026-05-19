@@ -84,7 +84,7 @@ class SchoolController extends Controller {
         $baseUrlWithoutScheme = preg_replace("(^https?://)", "", $baseUrl);
         $baseUrlWithoutScheme = str_replace("www.", "", $baseUrlWithoutScheme);
 
-        $schools = $this->schoolsRepository->builder()->latest()->first();
+        $schools = $this->schoolsRepository->builder()->withTrashed()->orderBy('id', 'desc')->first();
         try {
             $demoSchool = $this->schoolsRepository->builder()->where('type', 'demo')->withTrashed()->first() !== null ? 1 : 0;
         } catch (\Exception $e) {
@@ -121,7 +121,7 @@ class SchoolController extends Controller {
             'school_support_phone' => 'required|numeric|digits_between:1,16',
             'school_tagline'       => 'required',
             'school_address'       => 'required',
-            'school_image'         => 'required|mimes:jpg,jpeg,png,svg,svg+xml|max:2048',
+            'school_image'         => 'nullable|mimes:jpg,jpeg,png,svg,svg+xml|max:2048',
             'domain'               => 'nullable|unique:schools,domain',
             'school_code_prefix'   => 'required'
 
@@ -137,7 +137,7 @@ class SchoolController extends Controller {
                 ResponseService::validationError('Please contact the administrator to activate the email verification.');
             }
             
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $school_data = array(
                 'name'          => $request->school_name,
@@ -145,7 +145,7 @@ class SchoolController extends Controller {
                 'support_email' => $request->school_support_email,
                 'support_phone' => $request->school_support_phone,
                 'tagline'       => $request->school_tagline,
-                'logo'          => $request->file('school_image'),
+                'logo'          => $request->hasFile('school_image') ? $request->file('school_image') : '',
                 'domain'        => $request->domain,
                 'code'          => $school_code,
                 'type'          => "custom",
@@ -157,14 +157,10 @@ class SchoolController extends Controller {
 
             $school_name = str_replace('.','_',$request->school_name);
             // Use prefix-based database for shared hosting compatibility
-            $database_name = 'school_' . $schoolData->id . '_';
+            // Use prefix-based tables for shared hosting compatibility (no separate database)
+            $database_name = 's' . $schoolData->id . '_';
 
-            // Create tenant tables with prefix instead of separate database
-            SharedHostingTenantService::createTenantTables($schoolData->id);
-
-            // Switch to tenant to create admin user
-            SharedHostingTenantService::switchToTenant($schoolData->id);
-
+            // Create admin user in main database for now (tenant setup will be done separately)
             $admin_data = array(
                 'first_name' => "School",
                 'last_name'  => "Admin",
@@ -172,14 +168,11 @@ class SchoolController extends Controller {
                 'email'      => $request->school_support_email,
                 'password'   => Hash::make($request->school_support_phone),
                 'school_id'  => $schoolData->id,
-                'image'      => $request->file('school_image'),
+                'image'      => $request->hasFile('school_image') ? $request->file('school_image') : null,
             );
 
             //Call store function of User Repository and get the admin data
             $user = $this->userRepository->create($admin_data);
-
-            // Switch back to main database
-            SharedHostingTenantService::switchToMain();
 
 
             $schoolDataArray = [];
@@ -230,17 +223,6 @@ class SchoolController extends Controller {
             // Update Admin id to School Data
             $schoolData = $this->schoolsRepository->update($schoolData->id, ['admin_id' => $user->id,'database_name' => $database_name]);
 
-            $schoolService = app(SchoolDataService::class);
-            
-            // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
-            // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
-
-            // Create tenant tables with prefix-based approach
-            $schoolService->createDatabaseMigration($schoolData);
-
-            // Add Pre School Settings By Default
-            $schoolService->preSettingsSetup($schoolData);
-
             // Assign package
             if ($request->assign_package) {
                 // Create subscription plan
@@ -260,7 +242,13 @@ class SchoolController extends Controller {
                 $this->cache->removeSystemCache(config('constants.CACHE.SYSTEM.SETTINGS'));
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
+
+            // Tenant DDL + seed outside the main DB transaction (migrations may implicit-commit)
+            set_time_limit(300);
+            $schoolService = app(SchoolDataService::class);
+            $schoolService->preSettingsSetup($schoolData->fresh());
+
             $email_body = $this->replacePlaceholders($request, $user, $settings, $school_code);
             
             $data = [
@@ -281,10 +269,12 @@ class SchoolController extends Controller {
             ResponseService::successResponse('Data Stored Successfully');
 
         } catch (Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::connection('mysql')->rollBack();
+            }
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
                 ResponseService::warningResponse("School Registered successfully. But Email not sent.");
             } else {
-                DB::rollBack();
                 ResponseService::logErrorResponse($e, "School Controller -> Store method");
                 ResponseService::errorResponse();
             }
@@ -320,7 +310,12 @@ class SchoolController extends Controller {
     }
 
     public function show() {
+        \Illuminate\Support\Facades\Log::debug("SchoolController@show called by User ID: " . Auth::user()->id . " Role: " . (Auth::user()->roles->first()->name ?? 'None'));
+        if (Auth::user()->hasRole('Super Admin')) {
+             \Illuminate\Support\Facades\Log::debug("Super Admin detected, permission check should bypass.");
+        }
         ResponseService::noPermissionThenRedirect('schools-list');
+        \Illuminate\Support\Facades\Log::debug("Permission check passed for SchoolController@show");
         $offset = request('offset', 0);
         $limit = request('limit', 10);
         $sort = request('sort', 'id');
@@ -372,11 +367,12 @@ class SchoolController extends Controller {
         }
 
 
+
         $total = $sql->count();
 
         $sql->orderBy($sort, $order)->skip($offset)->take($limit);
         $res = $sql->get();
-
+        
         $bulkData = array();
         $bulkData['total'] = $total;
         $rows = array();
@@ -528,11 +524,8 @@ class SchoolController extends Controller {
                
             }
           
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school_database);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
-            DB::setDefaultConnection('school');
+            // Use prefix-based approach for shared hosting compatibility
+            SharedHostingTenantService::switchToTenant($request->edit_id);
 
             $schoolSettingData = array(
                 [
@@ -583,10 +576,8 @@ class SchoolController extends Controller {
                 SchoolSetting::upsert($schoolSettingData,['name','school_id'],['data','school_id','type']);
                 $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'),$request->edit_id);
                 
-                DB::setDefaultConnection('mysql');
-                Session::forget('school_database_name');
-                Session::flush();
-                Session::put('school_database_name', null);
+                // Switch back to main database context
+                SharedHostingTenantService::switchToMain();
 
                 // Assign package
                 if ($request->assign_package) {
@@ -634,9 +625,16 @@ class SchoolController extends Controller {
         ResponseService::noPermissionThenSendJson('schools-delete');
         try {
             $school = $this->schoolsRepository->builder()->withTrashed()->where('id',$id)->first();
-            DB::statement("DROP DATABASE IF EXISTS `{$school->database_name}`");
+            
+            // Drop tenant tables using prefix (shared hosting compatible)
+            SharedHostingTenantService::dropTenantTables($school->id);
+            
+            // Delete school files
             Storage::disk('public')->deleteDirectory($school->id);
+            
+            // Delete admin user
             User::where('id',$school->admin_id)->withTrashed()->forceDelete();
+            
             ResponseService::successResponse("Data Deleted Permanently");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e,'','cannot_delete_because_data_is_associated_with_other_data');
@@ -667,7 +665,7 @@ class SchoolController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $admin_data = array(
                 'school_id'  => $request->edit_id,
@@ -729,12 +727,10 @@ class SchoolController extends Controller {
                     $school = School::on('mysql')->where('code', $schoolCode)->first();
             
                     if ($school) {
-                        DB::setDefaultConnection('school');
-                        Config::set('database.connections.school.database', $school->database_name);
-                        DB::purge('school');
-                        DB::connection('school')->reconnect();
-
-                        DB::connection('school')->table('users')->where('id', $users->user->id)->update(['email_verified_at' => Carbon::now()]);
+                        // Use new prefix-based approach for shared hosting
+                        SharedHostingTenantService::switchToTenant($school->id);
+                        DB::table('users')->where('id', $users->user->id)->update(['email_verified_at' => Carbon::now()]);
+                        SharedHostingTenantService::switchToMain();
                     }
                 } else {
                     // Return a response if the school code is missing
@@ -758,13 +754,10 @@ class SchoolController extends Controller {
                             DB::setDefaultConnection('mysql');
                             DB::connection('mysql')->table('users')->where('id', $users->user->id)->update(['two_factor_enabled' => $request->two_factor_verification]);
 
-                            // School Admin Database Connection
-                            DB::setDefaultConnection('school');
-                            Config::set('database.connections.school.database', $school->database_name);
-                            DB::purge('school');
-                            DB::connection('school')->reconnect();
-
-                            DB::connection('school')->table('users')->where('id', $users->user->id)->update(['two_factor_enabled' => $request->two_factor_verification]);
+                            // School Admin Database Connection - Use new prefix-based approach
+                            SharedHostingTenantService::switchToTenant($school->id);
+                            DB::table('users')->where('id', $users->user->id)->update(['two_factor_enabled' => $request->two_factor_verification]);
+                            SharedHostingTenantService::switchToMain();
                             
                             $status = $request->two_factor_verification ? 'enabled' : 'disabled';
                             $completedActions[] = "Two factor authentication {$status} successfully";
@@ -777,7 +770,7 @@ class SchoolController extends Controller {
                 }
             }
             
-            DB::commit();
+            DB::connection('mysql')->commit();
             
             // Prepare success message based on completed actions
             if (!empty($completedActions)) {
@@ -789,10 +782,10 @@ class SchoolController extends Controller {
             ResponseService::successResponse($message);
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Updated successfully. But Email not sent.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "School Controller -> Update Admin method");
                 ResponseService::errorResponse();
             }
@@ -802,25 +795,21 @@ class SchoolController extends Controller {
     public function changeStatus($id) {
         ResponseService::noAnyPermissionThenRedirect(['schools-edit']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $school = $this->schoolsRepository->findById($id);
             $status = ['status' => $school->status == 0 ? 1 : 0];
             $this->schoolsRepository->update($id, $status);
-            DB::commit();
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
-            DB::setDefaultConnection('school');
-
-            DB::beginTransaction();
-            $school = $this->schoolsRepository->findById($id);
-            $this->schoolsRepository->update($id, $status);
-
-            DB::commit();
+            DB::connection('mysql')->commit();
+            
+            // Note: Status change is done in main database, no need to switch to tenant
+            // If tenant status update is needed, uncomment below:
+            // SharedHostingTenantService::switchToTenant($id);
+            // $this->schoolsRepository->update($id, $status);
+            // SharedHostingTenantService::switchToMain();
+            
             ResponseService::successResponse('Data updated successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "School Controller -> Change Status");
             ResponseService::errorResponse();
         }
@@ -861,7 +850,7 @@ class SchoolController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
 
-        if (env('RECAPTCHA_SECRET_KEY') ?? '') {
+        if (config('services.recaptcha.secret') ?? '') {
             $validator = Validator::make($request->all(), [
                 'g-recaptcha-response' => 'required',
             ]);
@@ -891,7 +880,7 @@ class SchoolController extends Controller {
 
             if(isset($settings['school_inquiry']) && ($settings['school_inquiry'] == 1) )
             {
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
 
                 $school_data = array(
                     'school_name'       => $request->school_name,        
@@ -950,13 +939,13 @@ class SchoolController extends Controller {
                     $this->extraSchoolData->createBulk($extraDetails);
                 }
 
-                DB::commit();
+                DB::connection('mysql')->commit();
         
                 ResponseService::successResponse(trans('School Inquiry Sent to Admin, wait for Admin Approval to successfully registered.'));
 
             }else{
-                DB::beginTransaction();
-                $schools = $this->schoolsRepository->builder()->latest()->first();
+                DB::connection('mysql')->beginTransaction();
+                $schools = $this->schoolsRepository->builder()->orderBy('id', 'desc')->first();
                 $school_code = date('Y').(($schools->id ?? 0) + 1);
                 $settings = $this->cache->getSystemSettings();
                 $prefix = $settings['school_code_prefix'] ?? 'SCH';
@@ -1033,16 +1022,13 @@ class SchoolController extends Controller {
                     $this->extraSchoolData->createBulk($extraDetails);
                 }
 
-                $school_name = str_replace('.','_',$request->school_name);
-                $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name," "));
-              
-                $schoolData = $this->schoolsRepository->update($schoolData->id, ['admin_id' => $user->id, 'database_name' => $database_name]);
+                $schoolData = $this->schoolsRepository->update($schoolData->id, ['admin_id' => $user->id, 'database_name' => 's' . $schoolData->id . '_']);
                 $schoolService = app(SchoolDataService::class);
-               
-                // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
-                // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
-                $schoolService->createDatabaseMigration($schoolData);
-                $schoolService->preSettingsSetup($schoolData);
+
+                DB::connection('mysql')->commit();
+
+                set_time_limit(300);
+                $schoolService->preSettingsSetup($schoolData->fresh());
                
                 if ($request->trial_package) {
                    
@@ -1071,11 +1057,12 @@ class SchoolController extends Controller {
             }
 
         } catch (Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::connection('mysql')->rollBack();
+            }
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
                 ResponseService::warningResponse("School Registration successfully. But Email not sent.");
             } else {
-                DB::rollBack();
                 ResponseService::logErrorResponse($e, "School Controller -> Registration method");
                 ResponseService::errorResponse();
             }
@@ -1159,9 +1146,9 @@ class SchoolController extends Controller {
     public function createDemoSchool()
     {
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
-            $schools = $this->schoolsRepository->builder()->latest()->first();        
+            $schools = $this->schoolsRepository->builder()->orderBy('id', 'desc')->first();        
             $school_code = date('Y').(($schools->id ?? 0) + 1);
             $settings = $this->cache->getSystemSettings();
             $prefix = $settings['school_prefix'] ?? 'SCH';
@@ -1199,30 +1186,28 @@ class SchoolController extends Controller {
             // $user->assignRole('School Admin');
 
             $school_name = str_replace('.','_',$schoolData->name);
-            $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name," "));
+            $database_name = 's' . $schoolData->id . '_';
 
             // Update Admin id to School Data
             $schoolData = $this->schoolsRepository->update($schoolData->id, ['admin_id' => $user->id, 'database_name' => $database_name]);
 
             $schoolService = app(SchoolDataService::class);
-            // Add Pre School Settings By Default
 
-            // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
-            // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
+            DB::connection('mysql')->commit();
 
-            $schoolService->createDatabaseMigration($schoolData);
-
-            $schoolService->preSettingsSetup($schoolData);
+            set_time_limit(300);
+            $schoolService->preSettingsSetup($schoolData->fresh());
 
             ResponseService::successResponse(trans('School Registration Successful'));
 
         } catch (Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::connection('mysql')->rollBack();
+            }
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
                 ResponseService::successResponse(trans('School Registration Successfully. But Email not sent'));
             } else {
-                DB::rollBack();
-                ResponseService::logErrorResponse($e, "School Controller -> Registration method");
+                ResponseService::logErrorResponse($e, "School Controller -> createDemoSchool method");
                 ResponseService::errorResponse();
             }
         }
@@ -1237,7 +1222,7 @@ class SchoolController extends Controller {
         $baseUrlWithoutScheme = preg_replace("(^https?://)", "", $baseUrl);
         $baseUrlWithoutScheme = str_replace("www.", "", $baseUrlWithoutScheme);
 
-        $schools = $this->schoolsRepository->builder()->latest()->first();
+        $schools = $this->schoolsRepository->builder()->orderBy('id', 'desc')->first();
         $school_code = date('Y').(($schools->id ?? 0) + 1);
         $settings = $this->cache->getSystemSettings();
         $prefix = $settings['school_prefix'] ?? 'SCH';
@@ -1349,7 +1334,7 @@ class SchoolController extends Controller {
             {
                 $school_code = $request->school_code_prefix . $request->school_code;
                 // dd($school_code);
-                DB::beginTransaction();
+                DB::connection('mysql')->beginTransaction();
 
                 $school_data = array(
                     'name'          => $request->school_name,
@@ -1366,8 +1351,7 @@ class SchoolController extends Controller {
                 $schoolData = $this->schoolsRepository->create($school_data);
                 
 
-                $school_name = str_replace('.','_',$request->school_name);
-                $database_name = 'eschool_saas_'.$schoolData->id.'_'.strtolower(strtok($school_name," "));
+                $database_name = 's' . $schoolData->id . '_';
 
                 $admin_data = array(
                     'first_name' => 'School',
@@ -1410,15 +1394,6 @@ class SchoolController extends Controller {
                 }
               
 
-                
-                // Skip CREATE DATABASE for shared hosting - use prefix-based tables instead
-                // DB::statement("CREATE DATABASE {$database_name}"); // REMOVED for shared hosting
-
-                $schoolService->createDatabaseMigration($schoolData);
-
-                // Add Pre School Settings By Default
-                $schoolService->preSettingsSetup($schoolData);
-
                 // Assign package
                 if ($request->assign_package) {
                     // Create subscription plan
@@ -1438,7 +1413,11 @@ class SchoolController extends Controller {
                     $this->cache->removeSystemCache(config('constants.CACHE.SYSTEM.SETTINGS'));
                 }
 
-                DB::commit();
+                DB::connection('mysql')->commit();
+
+                set_time_limit(300);
+                $schoolService->preSettingsSetup($schoolData->fresh());
+
                 $email_body = $this->replacePlaceholders($request, $user, $settings, $school_code);
                 
                 $data = [
@@ -1490,12 +1469,13 @@ class SchoolController extends Controller {
 
 
         } catch (Throwable $e) {
+            if (DB::transactionLevel() > 0) {
+                DB::connection('mysql')->rollBack();
+            }
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
                 ResponseService::warningResponse("School Registered successfully. But Email not sent.");
             } else {
-                DB::rollBack();
-                ResponseService::logErrorResponse($e, "School Controller -> Store method");
+                ResponseService::logErrorResponse($e, "School Controller -> schoolInquiryUpdate method");
                 ResponseService::errorResponse();
             }
 

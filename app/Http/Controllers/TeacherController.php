@@ -87,7 +87,7 @@ class TeacherController extends Controller {
             'image'             => 'nullable|image|mimes:jpeg,png,jpg,svg,gif,webp',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check free trial package
             $today_date = Carbon::now()->format('Y-m-d');
@@ -200,17 +200,17 @@ class TeacherController extends Controller {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Teacher', $user->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             $sendEmail = app(UserService::class);
             $sendEmail->sendStaffRegistrationEmail($user, $request->mobile);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Teacher Registered successfully. But Email not sent.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Teacher Controller -> Store method");
                 ResponseService::errorResponse();
             }
@@ -303,7 +303,7 @@ class TeacherController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $user_data = array(
                 ...$request->all(),
             );
@@ -358,13 +358,13 @@ class TeacherController extends Controller {
             //Call store function of User Repository and get the User Data
             $this->staff->update($user->staff->id, array('qualification' => $request->qualification, 'salary' => $request->salary,'joining_date'   => date('Y-m-d',strtotime($request->joining_date))));
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if ($e instanceof TypeError && Str::contains($e->getMessage(), ['Mail', 'Mailer', 'MailManager'])) {
                 ResponseService::warningResponse("Teacher Registered successfully. But Email not sent.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Teacher Controller -> Update method");
                 ResponseService::errorResponse();
             }
@@ -375,12 +375,12 @@ class TeacherController extends Controller {
     public function trash($id) {
         ResponseService::noPermissionThenSendJson('teacher-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->user->findTrashedById($id)->forceDelete();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Permanently");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Teacher Controller ->trash Method", 'cannot_delete_because_data_is_associated_with_other_data');
             ResponseService::errorResponse();
         }
@@ -390,7 +390,7 @@ class TeacherController extends Controller {
         // ResponseService::noFeatureThenSendJson('Teacher Management');
         ResponseService::noPermissionThenRedirect('teacher-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $teacher = $this->user->findTrashedById($id);
 
             if ($teacher->status == 0) {
@@ -406,7 +406,7 @@ class TeacherController extends Controller {
             }
 
             $this->user->builder()->where('id',$id)->withTrashed()->update(['status' => $teacher->status == 0 ? 1 : 0,'deleted_at' => $teacher->status == 1 ? now() : null]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e, 'Status methods -> Teacher controller');
@@ -417,7 +417,7 @@ class TeacherController extends Controller {
         // ResponseService::noFeatureThenSendJson('Teacher Management');
         ResponseService::noPermissionThenRedirect('teacher-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $userIds = json_decode($request->ids);
             foreach ($userIds as $userId) {
                 $teacher = $this->user->findTrashedById($userId);
@@ -434,7 +434,7 @@ class TeacherController extends Controller {
                 }
                 $this->user->builder()->where('id',$userId)->withTrashed()->update(['status' => $teacher->status == 0 ? 1 : 0,'deleted_at' => $teacher->status == 1 ? now() : null]);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);

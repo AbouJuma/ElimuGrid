@@ -28,22 +28,13 @@ class HostelController extends Controller
     public function getHostels(Request $request)
     {
         try {
-            $hostels = DB::connection('school')->table('hostels')
-                ->whereNull('deleted_at')
-                ->where('school_id', Auth::user()->school_id)
-                ->select('id', 'name', 'description', 'created_at')
-                ->get();
+            // Retrieve hostels using prefix-safe Eloquent model
+            $hostels = Hostel::owner()->get();
 
             // Get room counts and occupancy for each hostel
             $hostelData = $hostels->map(function ($hostel) {
-                $rooms = DB::connection('school')->table('rooms')
-                    ->where('hostel_id', $hostel->id)
-                    ->whereNull('deleted_at')
-                    ->selectRaw('SUM(capacity) as total_capacity, SUM(occupied_beds) as total_occupied')
-                    ->first();
-
-                $totalCapacity = $rooms->total_capacity ?? 0;
-                $totalOccupied = $rooms->total_occupied ?? 0;
+                $totalCapacity = $hostel->rooms()->sum('capacity');
+                $totalOccupied = $hostel->rooms()->sum('occupied_beds');
                 $availableBeds = $totalCapacity - $totalOccupied;
                 $occupancyRate = $totalCapacity > 0 ? round(($totalOccupied / $totalCapacity) * 100, 2) : 0;
 
@@ -55,7 +46,7 @@ class HostelController extends Controller
                     'occupied_beds' => $totalOccupied,
                     'available_beds' => $availableBeds,
                     'occupancy_rate' => $occupancyRate . '%',
-                    'created_at' => $hostel->created_at,
+                    'created_at' => $hostel->created_at ? $hostel->created_at->toDateTimeString() : '',
                     'operate' => '<a href="' . route('hostel.rooms.index', ['hostel_id' => $hostel->id]) . '" class="btn btn-sm btn-info">Rooms</a> ' .
                         '<button class="btn btn-sm btn-primary edit-btn" data-id="' . $hostel->id . '">Edit</button> ' .
                         '<button class="btn btn-sm btn-danger delete-btn" data-id="' . $hostel->id . '">Delete</button>',
@@ -89,7 +80,7 @@ class HostelController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $hostel = Hostel::create([
                 'name' => $request->name,
@@ -97,7 +88,7 @@ class HostelController extends Controller
                 'school_id' => Auth::user()->school_id,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -105,7 +96,7 @@ class HostelController extends Controller
                 'data' => $hostel
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to create hostel: ' . $e->getMessage()], 500);
         }
     }
@@ -144,7 +135,7 @@ class HostelController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $hostel = Hostel::owner()->findOrFail($id);
             $hostel->update([
@@ -152,7 +143,7 @@ class HostelController extends Controller
                 'description' => $request->description,
             ]);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
@@ -160,7 +151,7 @@ class HostelController extends Controller
                 'data' => $hostel
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to update hostel: ' . $e->getMessage()], 500);
         }
     }
@@ -174,35 +165,35 @@ class HostelController extends Controller
         ResponseService::noPermissionThenRedirect('hostel-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $hostel = Hostel::owner()->findOrFail($id);
 
-            // Check if hostel has active allocations
-            $activeAllocations = DB::connection('school')->table('hostel_allocations')
+            // Check if hostel has active allocations using prefix-safe Eloquent model
+            $activeAllocations = \App\Models\HostelAllocation::owner()
                 ->where('hostel_id', $id)
-                ->where('status', 'active')
+                ->active()
                 ->count();
 
             if ($activeAllocations > 0) {
                 return response()->json(['error' => 'Cannot delete hostel with active student allocations'], 400);
             }
 
-            // Delete associated rooms first
-            DB::connection('school')->table('rooms')
+            // Delete associated rooms first using prefix-safe Eloquent query
+            \App\Models\Room::owner()
                 ->where('hostel_id', $id)
-                ->update(['deleted_at' => now()]);
+                ->delete();
 
             $hostel->delete();
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Hostel deleted successfully'
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             return response()->json(['error' => 'Failed to delete hostel: ' . $e->getMessage()], 500);
         }
     }

@@ -189,7 +189,7 @@ class StaffApiController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $month = $request->month;
             $year = $request->year;
             $startDate = Carbon::createFromFormat('Y-m', "$year-$month")->startOfMonth();
@@ -225,7 +225,7 @@ class StaffApiController extends Controller
             }
 
             $this->expense->upsert($data, ['staff_id', 'month', 'year'], ['amount', 'session_year_id', 'basic_salary', 'date', 'title', 'description', 'paid_leaves']);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $th) {
             ResponseService::logErrorResponse($th);
@@ -483,7 +483,7 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $leave = $this->leave->update($request->leave_id, ['status' => $request->status]);
 
             $user[] = $leave->user_id;
@@ -500,16 +500,16 @@ class StaffApiController extends Controller
                 send_notification($user, $title, $body, $type);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -527,12 +527,12 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->leave->deleteById($request->leave_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th);
             ResponseService::errorResponse();
         }
@@ -549,12 +549,12 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $sql = $this->announcement->builder()->whereHas('announcement_class', function ($q) use ($request) {
                 $q->where('class_section_id', $request->class_section_id);
             })->with('announcement_class')->where('session_year_id', $sessionYear->id)->with('file')->paginate(10);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Fetched Successfully', $sql);
         } catch (\Throwable $th) {
             ResponseService::logErrorResponse($th);
@@ -574,7 +574,7 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $announcementData = array(
                 'title'           => $request->title,
@@ -622,16 +622,16 @@ class StaffApiController extends Controller
                 send_notification($notifyUser, $title, $body, $type); // Send Notification
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -651,7 +651,7 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $announcementData = array(
                 'title'           => $request->title,
@@ -713,16 +713,16 @@ class StaffApiController extends Controller
                 // send_notification($notifyUser, $title, $body, $type); // Send Notification
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }
@@ -740,9 +740,9 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->announcement->deleteById($request->announcement_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (\Throwable $th) {
             ResponseService::logErrorResponse($th);
@@ -848,7 +848,7 @@ class StaffApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $data = [
                 'title' => $request->title,
@@ -969,7 +969,7 @@ class StaffApiController extends Controller
             $body = $request->message;
             $type = 'Notification';
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             send_notification($notifyUser, $title, $body, $type, $customData); // Send Notification
 
             ResponseService::successResponse('Notification Send Successfully');
@@ -977,10 +977,10 @@ class StaffApiController extends Controller
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }

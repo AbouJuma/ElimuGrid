@@ -6,9 +6,9 @@ use App\Services\CachingService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use App\Services\SharedHostingTenantService;
 use Symfony\Component\HttpFoundation\Response;
 
 class SwitchDatabase
@@ -23,17 +23,12 @@ class SwitchDatabase
 
         $school_database_name = Session::get('school_database_name');
         if ($school_database_name) {
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database_name);
             DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school_database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
-            DB::setDefaultConnection('school');
-            if (Auth::user()) {
-                return $next($request);
-            }
-            return redirect()->back()->with('error','Invalid credential.');
+            // Don't check Auth::user() here - let other middleware handle authentication
+            return $next($request);
         } else {
-            DB::purge('school');
+            SharedHostingTenantService::resetSchoolDatabaseConnection();
             DB::connection('mysql')->reconnect();
             DB::setDefaultConnection('mysql');
         }

@@ -1,4 +1,27 @@
 <nav class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top d-flex flex-row">
+@php
+    $authHeaderUser = Auth::user();
+    /** Only Super Admin hides the session year in the header; all tenant roles (School Admin, Teacher, Guardian, custom) unchanged. */
+    $hideSessionYearInHeader = $authHeaderUser && $authHeaderUser->hasRole('Super Admin');
+
+    $headerSessionYear = null;
+    if (isset($sessionYear)) {
+        if ($sessionYear instanceof \Illuminate\Support\Collection) {
+            $headerSessionYear = $sessionYear->firstWhere('default', 1) ?? $sessionYear->first();
+        } elseif (is_object($sessionYear)) {
+            $headerSessionYear = $sessionYear;
+        }
+    }
+
+    $headerSemester = null;
+    if (isset($semester) && is_object($semester)) {
+        if ($semester instanceof \Illuminate\Support\Collection) {
+            $headerSemester = $semester->firstWhere('default', 1) ?? $semester->first();
+        } else {
+            $headerSemester = $semester;
+        }
+    }
+@endphp
     <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-center">
         <a class="navbar-brand brand-logo" href="{{ URL::to('/') }}">
             <img src="{{ $schoolSettings['horizontal_logo'] ?? $systemSettings['horizontal_logo'] ?? asset('images/elimugrid/elogo.png') }}" alt="logo" class="custom-default-image">
@@ -42,9 +65,9 @@
                 </li>
             @endcan
 
-            @if (isset($sessionYear) && !Auth::user()->hasRole('Super Admin'))
+            @if ($headerSessionYear && ! $hideSessionYearInHeader)
                 <li class="d-none d-md-block d-sm-block nav-item">
-                    <div class="text-dark">{{ __('session_years') . ' : '}} <span id="sessionYearNameHeader">{{$sessionYear->name}}</span><span id="semesterNameHeader">{{ (isset($semester) ? ', '.$semester->name : null)}}</span></div>
+                    <div class="text-dark">{{ __('session_years') . ' : '}} <span id="sessionYearNameHeader">{{ $headerSessionYear->name }}</span><span id="semesterNameHeader">{{ ($headerSemester && isset($headerSemester->name)) ? ', '.$headerSemester->name : '' }}</span></div>
                 </li>
             @endif
 
@@ -76,10 +99,10 @@
             <li class="nav-item nav-profile dropdown">
                 <a class="nav-link dropdown-toggle" id="profileDropdown" href="#" data-toggle="dropdown" aria-expanded="true">
                     <div class="nav-profile-img">
-                        <img src="{{ Auth::user()->image }}" alt="image">
+                        <img src="{{ Auth::user()?->image ?? asset('images/circle.svg') }}" alt="image">
                     </div>
                     <div class="nav-profile-text">
-                        <p class="mb-1 text-black">{{ Auth::user()->first_name }}</p>
+                        <p class="mb-1 text-black">{{ Auth::user()?->first_name ?? session('auth_user_name', __('User')) }}</p>
                     </div>
                 </a>
                 <div class="dropdown-menu navbar-dropdown" aria-labelledby="profileDropdown">

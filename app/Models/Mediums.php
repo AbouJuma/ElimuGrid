@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
 
+use App\Traits\TenantModel;
+
+
 class Mediums extends Model
 {
+    use SoftDeletes, HasFactory, TenantModel;
     protected $fillable = ['name', 'school_id'];
-    use SoftDeletes;
-    use HasFactory;
     protected $hidden = ['created_at','updated_at'];
     // protected $connection = 'school';
 

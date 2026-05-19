@@ -33,9 +33,9 @@ use App\Rules\MaxFileSize;
 use App\Services\CachingService;
 use App\Services\FeaturesService;
 use App\Services\ResponseService;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -114,10 +114,7 @@ class StudentApiController extends Controller {
         $school = School::on('mysql')->where('code',$request->school_code)->first();
 
         if ($school) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
         } else {
             ResponseService::errorResponse('Invalid Login Credentials', null, config('constants.RESPONSE_CODE.INVALID_LOGIN'));
@@ -181,10 +178,7 @@ class StudentApiController extends Controller {
                 $school = School::on('mysql')->where('code',$schoolCode)->first();
 
                 if ($school) {
-                    DB::setDefaultConnection('school');
-                    Config::set('database.connections.school.database', $school->database_name);
-                    DB::purge('school');
-                    DB::connection('school')->reconnect();
+                    SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                     DB::setDefaultConnection('school');
                 
                     $user = $this->user->builder()->whereHas('student', function ($query) use ($request) {
@@ -243,7 +237,7 @@ class StudentApiController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear(); // Default Session Year From Cache
             $student = $request->user()->student; // Logged in Student Details
             $classSection = $student->class_section; // Class Section Data
@@ -265,10 +259,10 @@ class StudentApiController extends Controller {
 
             // Update OR Create Data
             $this->studentSubject->upsert($studentSubject, ['student_id', 'class_subject_id', 'class_section_id', 'session_year_id'], ['student_id', 'class_subject_id', 'class_section_id', 'session_year_id',]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Subject Selected Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "StudentApiController :- selectSubject Method");
             ResponseService::errorResponse();
         }
@@ -430,7 +424,7 @@ class StudentApiController extends Controller {
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $assignmentSubmissionData = array();
             $student = $request->user()->student;
             $sessionYear = $this->cache->getDefaultSessionYear();
@@ -483,10 +477,10 @@ class StudentApiController extends Controller {
                 $this->files->createBulk($fileData); // Store File Data
             }
             $submittedAssignment = $this->assignmentSubmission->builder()->where('id', $assignmentSubmission->id)->with('file')->get();
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Assignments Submitted Successfully", $submittedAssignment);
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Api Controller -> submitAssignment Method");
             ResponseService::errorResponse();
         }
@@ -501,7 +495,7 @@ class StudentApiController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $student = $request->user()->student;
             $assignment_submission = AssignmentSubmission::where('id', $request->assignment_submission_id)->where('student_id', $student->id)->with('file')->first();
 
@@ -513,13 +507,13 @@ class StudentApiController extends Controller {
                 }
                 $assignment_submission->file()->delete();
                 $assignment_submission->delete();
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse("Assignments Deleted Successfully");
             } else {
                 ResponseService::errorResponse("You can not delete assignment");
             }
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Student Api Controller -> deleteAssignmentSubmission Method");
             ResponseService::errorResponse();
         }
@@ -837,7 +831,7 @@ class StudentApiController extends Controller {
             $classSectionId = $student->class_section->id;
             $sessionYear = $this->cache->getDefaultSessionYear();
 
-            if (env('DEMO_MODE')) {
+            if (config('app.demo_mode')) {
                 $check_student_status = $this->studentOnlineExamStatus->builder()->where('student_id', $student->user_id);
                 if ($check_student_status->count()) {
                     $status_id = $check_student_status->pluck('id');
@@ -965,7 +959,7 @@ class StudentApiController extends Controller {
         try {
             $student = Auth::user()->student;
 
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // Check Online Exam Exists or not
 //            $onlineExamData = $this->onlineExam->findById($request->online_exam_id);
 //            if (!$onlineExamData) {
@@ -1013,11 +1007,11 @@ class StudentApiController extends Controller {
                 ['student_id' => $student->user_id, 'online_exam_id' => $request->online_exam_id],
                 ['status' => 2]
             );
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
 
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "StudentApiController submitOnlineExamAnswers Method");
             ResponseService::errorResponse();
         }

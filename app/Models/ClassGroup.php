@@ -6,10 +6,11 @@ use Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Storage;
+use App\Traits\TenantModel;
 
 class ClassGroup extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['name','description','image','class_ids','school_id'];
 
     protected $appends = ['class_name'];

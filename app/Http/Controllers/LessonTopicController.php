@@ -117,7 +117,7 @@ class LessonTopicController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $section_ids = is_array($request->class_section_id) ? $request->class_section_id : [$request->class_section_id];
 
@@ -195,7 +195,7 @@ class LessonTopicController extends Controller {
 
             $user = $this->student->builder()->with('user')->where('class_section_id', $request->class_section_id)->pluck('user_id')->toArray();
             $subjectTeacherData = $this->subjectTeacher->builder()->whereIn('class_section_id', $request->class_section_id)->where(['teacher_id' => $request->user_id, 'class_subject_id' => $classSubjects->id])->with('subject')->first(); // Get the Subject Teacher Data
-            $subjectName = $subjectTeacherData->subject_with_name; // Subject Name
+            $subjectName = $subjectTeacherData->subject_with_name ?? ($classSubjects->subject->name ?? ''); // Subject Name
 
             $title = 'Topic Alert !!!';
             $body = 'A new topic has been added to the lesson "' . $request->name . '" under the subject "' . $subjectName . '".';
@@ -203,16 +203,16 @@ class LessonTopicController extends Controller {
            
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Lesson Topic Controller -> Store Method");
                 ResponseService::errorResponse();
             }
@@ -294,7 +294,7 @@ class LessonTopicController extends Controller {
                 $class_subject_id = request('class_subject_id');
                 $query->where(function ($query) use ($class_subject_id) {
                     $query->whereHas('topic_commons.class_subject', function ($q) use ($class_subject_id) {
-                        $q->where('class_subjects.subject_id', $class_subject_id);
+                        $q->where('subject_id', $class_subject_id);
                     });
                 });
             })
@@ -310,7 +310,7 @@ class LessonTopicController extends Controller {
                 $query->whereHas('lesson', function ($q) use ($lesson_id) {
                     $q->where('id', $lesson_id);
                     $q->whereHas('lesson_commons.class_subject', function ($q) use ($lesson_id) {
-                        $q->where('class_subjects.subject_id', $lesson_id);
+                        $q->where('subject_id', $lesson_id);
                     });
                 });
             })
@@ -401,7 +401,7 @@ class LessonTopicController extends Controller {
             ResponseService::errorResponse($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $topic = $this->topic->update($id, $request->all());
 
             //Add the new Files
@@ -471,23 +471,24 @@ class LessonTopicController extends Controller {
             $user = $this->student->builder()->with('user')->where('class_section_id', $request->class_section_id)->pluck('user_id')->toArray();
             $lesson = $this->lesson->builder()->where('id', $request->lesson_id)->pluck('name')->first();
             $subjectName = $this->class_subjects->builder()->with('subject')->where('id', $request->class_subject_id)->first();
+            $subjectNameString = $subjectName->subject->name ?? '';
            
             $title = 'Topic Alert !!!';
-            $body = 'A new topic has been updated for the lesson "' . $lesson . '" under the subject "' . $subjectName->subject->name . '".';
+            $body = 'A new topic has been updated for the lesson "' . $lesson . '" under the subject "' . $subjectNameString . '".';
             $type = "lesson";
            
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Lesson Topic Controller -> Update Method");
                 ResponseService::errorResponse();
             }
@@ -499,14 +500,14 @@ class LessonTopicController extends Controller {
         ResponseService::noFeatureThenRedirect('Lesson Management');
         ResponseService::noPermissionThenSendJson('topic-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->topic->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->deleteSessionYearsTracking('App\Models\LessonTopic', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Lesson Topic Controller -> Delete Method");
             ResponseService::errorResponse();
         }

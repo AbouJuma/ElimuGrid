@@ -8,7 +8,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 
+use App\Traits\TenantModel;
+
+
 class Announcement extends Model {
+    use TenantModel;
     protected $fillable = [
         'title',
         'description',

@@ -54,17 +54,17 @@ class ExpenseController extends Controller {
         ResponseService::noFeatureThenRedirect('Expense Management');
         ResponseService::noPermissionThenRedirect('expense-create');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = ['category_id' => $request->category_id, 'title' => $request->title, 'ref_no' => $request->ref_no, 'amount' => $request->amount, 'date' => date('Y-m-d', strtotime($request->date)), 'description' => $request->description, 'session_year_id' => $request->session_year_id];
             $expense = $this->expense->create($data);
 
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Expense', $expense->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -155,13 +155,13 @@ class ExpenseController extends Controller {
         ResponseService::noFeatureThenRedirect('Expense Management');
         ResponseService::noPermissionThenSendJson('expense-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = ['category_id' => $request->category_id, 'title' => $request->title, 'ref_no' => $request->ref_no, 'amount' => $request->amount, 'date' => date('Y-m-d', strtotime($request->date)), 'description' => $request->description, 'session_year_id' => $request->session_year_id,];
             $this->expense->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Controller -> Update Method");
             ResponseService::errorResponse();
         }
@@ -173,14 +173,14 @@ class ExpenseController extends Controller {
         ResponseService::noPermissionThenSendJson('expense-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->expense->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Expense', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Controller -> Destroy Method");
             ResponseService::errorResponse();
         }
@@ -218,7 +218,7 @@ class ExpenseController extends Controller {
 
             ResponseService::successResponse('Data Fetched Successfully', $data);
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Controller -> Filter Method");
             ResponseService::errorResponse();
         }

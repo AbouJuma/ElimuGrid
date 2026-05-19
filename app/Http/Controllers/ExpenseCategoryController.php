@@ -50,7 +50,7 @@ class ExpenseCategoryController extends Controller
             'name' => 'required'
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [
                 'name' => $request->name,
                 'description' => $request->description
@@ -60,10 +60,10 @@ class ExpenseCategoryController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\ExpenseCategory', $expenseCategory->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Category Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -136,16 +136,16 @@ class ExpenseCategoryController extends Controller
         ResponseService::noFeatureThenRedirect('Expense Management');
         ResponseService::noPermissionThenSendJson('expense-category-edit');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [
                 'name' => $request->name,
                 'description' => $request->description
             ];
             $this->expenseCategory->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Category Controller -> Update Method");
             ResponseService::errorResponse();
         }
@@ -157,14 +157,14 @@ class ExpenseCategoryController extends Controller
         ResponseService::noPermissionThenSendJson('expense-category-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->expenseCategory->deleteById($id);
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\ExpenseCategory', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Category Controller -> Delete Method");
             ResponseService::errorResponse();
         }
@@ -176,12 +176,12 @@ class ExpenseCategoryController extends Controller
         ResponseService::noPermissionThenSendJson('expense-category-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->expenseCategory->restoreById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Category Controller -> Restore Method");
             ResponseService::errorResponse();
         }
@@ -193,17 +193,17 @@ class ExpenseCategoryController extends Controller
         ResponseService::noPermissionThenSendJson('expense-category-delete');
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $category = $this->expenseCategory->findOnlyTrashedById($id);
             if (count($category->expense)) {
                 ResponseService::errorResponse('cannot_delete_because_data_is_associated_with_other_data');
             } else {
                 $this->expenseCategory->permanentlyDeleteById($id);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Expense Category Controller -> Restore Method");
             ResponseService::errorResponse();
         }

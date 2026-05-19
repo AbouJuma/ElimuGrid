@@ -62,7 +62,11 @@ return [
         ],
         User::class => [
             Staff::class,
-            'staff'
+            'staff',
+
+            \Spatie\Permission\Models\Role::class,
+            'roles',
+            'permissions'
         ]
 
     ],
@@ -103,7 +107,6 @@ return [
      * \BeyondCode\QueryDetector\Outputs\Log::class
      */
     'output' => [
-        \BeyondCode\QueryDetector\Outputs\Alert::class,
         \BeyondCode\QueryDetector\Outputs\Log::class,
     ]
 ];

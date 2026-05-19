@@ -41,7 +41,7 @@ class GradeController extends Controller {
             }
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Exam Controller -> Grade Create OR Update method");
             ResponseService::errorResponse();
         }

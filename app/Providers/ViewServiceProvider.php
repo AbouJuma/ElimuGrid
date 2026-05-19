@@ -7,8 +7,7 @@ use App\Models\Package;
 use App\Models\School;
 use App\Models\User;
 use App\Services\CachingService;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Config;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -83,10 +82,7 @@ class ViewServiceProvider extends ServiceProvider {
         
         
         if ($school) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
             $teachers = User::where('school_id',$school->id)->role('Teacher')->select('id','first_name','last_name','image')->with('staff')->get();
             
@@ -106,7 +102,7 @@ class ViewServiceProvider extends ServiceProvider {
             $view->with('systemSettings', $cache->getSystemSettings());
             $view->with('languages', $cache->getLanguages());
 
-            if (!empty(Auth::user()->school_id)) {
+            if (CachingService::resolveEffectiveSchoolId() !== null) {
                 $view->with('sessionYear', $cache->getDefaultSessionYear());
                 $view->with('schoolSettings', $cache->getSchoolSettings());
                 $view->with('semester', $cache->getDefaultSemesterData());
@@ -116,7 +112,7 @@ class ViewServiceProvider extends ServiceProvider {
         /*** Include File ***/
         View::composer('layouts.include', static function (\Illuminate\View\View $view) use ($cache) {
             $view->with('systemSettings', $cache->getSystemSettings());
-            if (!empty(Auth::user()->school_id)) {
+            if (CachingService::resolveEffectiveSchoolId() !== null) {
                 $view->with('schoolSettings', $cache->getSchoolSettings());
             }
         });
@@ -153,7 +149,7 @@ class ViewServiceProvider extends ServiceProvider {
 
         View::composer('layouts.home_page.master', static function (\Illuminate\View\View $view) use ($cache) {
             $view->with('systemSettings', $cache->getSystemSettings());
-            if (!empty(Auth::user()->school_id)) {
+            if (CachingService::resolveEffectiveSchoolId() !== null) {
                 $view->with('schoolSettings', $cache->getSchoolSettings());
             }
         });
@@ -178,7 +174,7 @@ class ViewServiceProvider extends ServiceProvider {
         /*** Footer File ***/
         View::composer('layouts.footer_js', static function (\Illuminate\View\View $view) use ($cache) {
             $view->with('systemSettings', $cache->getSystemSettings());
-            if (!empty(Auth::user()->school_id)) {
+            if (CachingService::resolveEffectiveSchoolId() !== null) {
                 $view->with('schoolSettings', $cache->getSchoolSettings());
             }
         });

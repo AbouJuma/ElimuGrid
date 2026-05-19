@@ -12,6 +12,9 @@ class School extends Model
 {
     use SoftDeletes;
     use HasFactory;
+
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'name',
         'address',

@@ -8,9 +8,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
+use App\Services\SharedHostingTenantService;
 
 class DemoMiddleware {
     /**
@@ -24,13 +24,10 @@ class DemoMiddleware {
 //        echo $request->getRequestUri();
         $school_database_name = Session::get('school_database_name');
         if ($school_database_name) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school_database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database_name);
             DB::setDefaultConnection('school');
         } else {
-            DB::purge('school');
+            SharedHostingTenantService::resetSchoolDatabaseConnection();
             DB::connection('mysql')->reconnect();
             DB::setDefaultConnection('mysql');
         }
@@ -54,7 +51,7 @@ class DemoMiddleware {
             "2024-2571",
             "subhamsharma5961@gmail.com"
         ];
-        if (env('DEMO_MODE') && !$request->isMethod('get') && Auth::user() && !in_array(Auth::user()->email, $excludeEmails) && !in_array($request->getRequestUri(), $exclude_uri)) {
+        if (config('app.demo_mode') && !$request->isMethod('get') && Auth::user() && !in_array(Auth::user()->email, $excludeEmails) && !in_array($request->getRequestUri(), $exclude_uri)) {
             $excluded_ips = ['103.30.227.53','103.30.227.54','103.30.226.49']; // replace with the IPs you want to exclude
             $test_school_panel = ['jamie.smith@gmail.com','thor@gmail.com','2024-2571','subhamsharma5961@gmail.com'];  // Add testing school user email
             if (!in_array($request->ip(), $excluded_ips)) {

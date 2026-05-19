@@ -6,8 +6,6 @@ use App\Models\Feature;
 use App\Models\SubscriptionBill;
 use App\Repositories\School\SchoolInterface;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
-
 class FeaturesService {
     public function __construct() {
         // $this->features = app(UserInterface::class)->features();
@@ -15,7 +13,7 @@ class FeaturesService {
 
     public static function getFeatures($schoolID = null) {
         // Fetch All the Features of the School in which User is associated. Then Cache that result for 30 minutes
-        $schoolID = !empty($schoolID) ? $schoolID : Auth::user()->school_id;
+        $schoolID = CachingService::resolveEffectiveSchoolId($schoolID);
         if (!empty($schoolID)) {
             return app(CachingService::class)->schoolLevelCaching(config('constants.CACHE.SCHOOL.FEATURES'), function () use ($schoolID) {
                 $active_subscription = app(SubscriptionService::class)->active_subscription($schoolID);
@@ -52,10 +50,10 @@ class FeaturesService {
             }, $schoolID);
         }
 
-//        if (empty(Auth::user()->school_id)) {
-//            // IF it's a Super Admin or Staff then Fetch all the Features
-//            return Feature::pluck('name', 'id')->toArray();
-//        }
+        if (empty($schoolID)) {
+            // IF it's a Super Admin or Staff then Fetch all the Features
+            return Feature::pluck('name', 'id')->toArray();
+        }
 
         return [];
     }

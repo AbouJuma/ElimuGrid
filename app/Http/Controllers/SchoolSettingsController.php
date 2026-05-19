@@ -27,13 +27,12 @@ use Storage;
 use Throwable;
 use ZipArchive;
 use App\Services\SchoolDataService;
+use App\Services\SharedHostingTenantService;
 use App\Models\School;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Session;
 
 class SchoolSettingsController extends Controller {
-    // Initializing the Settings Repository
     private SchoolSettingInterface $schoolSettings;
     private CachingService $cache;
     private ClassSectionInterface $classSection;
@@ -160,10 +159,7 @@ class SchoolSettingsController extends Controller {
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
 
             DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school_database);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
-            DB::setDefaultConnection('school');
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school_database);
 
             if ($request->change_roll_number) {
                 // Get Sort And Order
@@ -197,10 +193,10 @@ class SchoolSettingsController extends Controller {
                 $this->student->upsert($studentArray, ['id'], ['roll_number']);
 
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "SchoolSettings Controller -> Store method");
             ResponseService::errorResponse();
         }
@@ -216,13 +212,13 @@ class SchoolSettingsController extends Controller {
     public function onlineExamStore(Request $request) {
         ResponseService::noPermissionThenRedirect('school-setting-manage');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->schoolSettings->updateOrCreate(["name" => $request->name], ["data" => $request->data, "type" => "string"]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "SchoolSettings Controller -> storeOnlineExamTermsCondition method");
             ResponseService::errorResponse();
         }
@@ -302,7 +298,7 @@ class SchoolSettingsController extends Controller {
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = array();
             foreach ($settings as $key => $rule) {
                 if ($key == 'background_image' || $key == 'staff_background_image' || $key == 'signature') {
@@ -353,7 +349,7 @@ class SchoolSettingsController extends Controller {
             $this->schoolSettings->upsert($data, ["name"], ["data"]);
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $th) {
             ResponseService::logErrorResponse($th);
@@ -366,7 +362,7 @@ class SchoolSettingsController extends Controller {
         ResponseService::noFeatureThenSendJson('ID Card - Certificate Generation');
         ResponseService::noAnyPermissionThenRedirect(['id-card-settings']);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $settings = $this->cache->getSchoolSettings();
             if ($type == 'background') {
                 $data = explode("storage/", $settings['background_image'] ?? '');
@@ -387,7 +383,7 @@ class SchoolSettingsController extends Controller {
                 }
                 $this->schoolSettings->builder()->where('name','signature')->delete();
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (\Throwable $th) {

@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 
+use App\Traits\TenantModel;
+
 class ExamMarks extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = [
         'exam_timetable_id',
         'student_id',

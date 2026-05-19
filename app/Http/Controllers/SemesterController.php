@@ -15,10 +15,12 @@ use Throwable;
 class SemesterController extends Controller {
     private SemesterInterface $semester;
     private CachingService $cache;
+    private SessionYearsTrackingsService $sessionYearsTrackingsService;
 
-    public function __construct(SemesterInterface $semester, CachingService $cachingService) {
+    public function __construct(SemesterInterface $semester, CachingService $cachingService, SessionYearsTrackingsService $sessionYearsTrackingsService) {
         $this->semester = $semester;
         $this->cache = $cachingService;
+        $this->sessionYearsTrackingsService = $sessionYearsTrackingsService;
     }
 
     public function index() {

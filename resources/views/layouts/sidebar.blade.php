@@ -18,7 +18,7 @@
             </a>
         </li>
         {{-- Academics --}}
-        @canany(['medium-create','section-create','subject-create','class-create','subject-create','promote-student-create','transfer-student-create'])
+        @if(Auth::user()->hasRole('School Admin') || Auth::user()->canany(['medium-create','section-create','subject-create','class-create','subject-create','promote-student-create','transfer-student-create']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#academics-menu" aria-expanded="false" aria-controls="academics-menu">
                     <i class="fa fa-university menu-icon"></i>
@@ -80,7 +80,7 @@
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- Custom Form Fields --}}
         @role('School Admin')
@@ -95,17 +95,20 @@
         @endrole
 
         {{-- Class Section For Teacher --}}
-        @role('Teacher')
-        <li class="nav-item">
+        @if(Session::get('auth_user_id'))
+            @php $user = \App\Models\User::find(Session::get('auth_user_id')); @endphp
+            @if($user && $user->hasRole('Teacher'))
+                    <li class="nav-item">
             <a class="nav-link" href="{{ route('class-section.index') }}">
                 <i class="fa fa-university menu-icon"></i>
                 <span class="menu-title"> {{ __('Class Section') }} </span>
             </a>
         </li>
-        @endrole
+            @endif
+        @endif
 
         {{-- student --}}
-        @canany(['student-create', 'student-list', 'student-reset-password', 'class-teacher','form-fields-list', 'form-fields-create', 'form-fields-edit', 'form-fields-delete','guardian-create'])
+        @if(Auth::user()->hasRole('School Admin') || Auth::user()->canany(['student-create', 'student-list', 'student-reset-password', 'class-teacher','form-fields-list', 'form-fields-create', 'form-fields-edit', 'form-fields-delete','guardian-create']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#student-menu" aria-expanded="false" aria-controls="academics-menu">
                     <i class="fa fa-graduation-cap menu-icon"></i>
@@ -151,10 +154,10 @@
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- teacher --}}
-        @can('teacher-create')
+        @if(Auth::user()->hasRole('School Admin') || Auth::user()->can('teacher-create'))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#teacher-menu" aria-expanded="false" aria-controls="academics-menu">
                     <i class="fa fa-user menu-icon"></i>
@@ -178,20 +181,23 @@
                     </ul>
                 </div>
             </li>
-        @endcan
+        @endif
 
 
 
         {{-- timetable --}}
-        @if(Auth::user()->hasRole('Teacher'))
-            <li class="nav-item">
-                <a href="{{ route('timetable.teacher.show', Auth::user()->id) }}" class="nav-link" data-access="@hasFeatureAccess('Timetable Management')">
-                    <i class="fa fa-calendar menu-icon"></i>
-                    <span class="menu-title">{{ __('timetable') }}</span>
-                </a>
-            </li>
+        @if(Session::get('auth_user_id'))
+            @php $user = \App\Models\User::find(Session::get('auth_user_id')); @endphp
+            @if($user && $user->hasRole('Teacher'))
+                    <li class="nav-item">
+                        <a href="{{ route('timetable.teacher.show', $user->id) }}" class="nav-link" data-access="@hasFeatureAccess('Timetable Management')">
+                            <i class="fa fa-calendar menu-icon"></i>
+                            <span class="menu-title">{{ __('timetable') }}</span>
+                        </a>
+                    </li>
+            @endif
         @else
-            @canany(['timetable-create', 'timetable-list'])
+            @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Timetable Management') : Auth::user()->canany(['timetable-create', 'timetable-list']))
                 <li class="nav-item">
                     <a class="nav-link" data-toggle="collapse" href="#timetable-menu" aria-expanded="false" aria-controls="timetable-menu" data-access="@hasFeatureAccess('Timetable Management')">
                         <i class="fa fa-calendar menu-icon"></i>
@@ -203,13 +209,13 @@
                         <ul class="nav flex-column sub-menu">
                             @can('timetable-create')
                                 <li class="nav-item">
-                                    <a href="{{ route('timetable.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Timetable Management')">{{ __('create_timetable') }} </a>
+                                    <a href="{{ route('timetable.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Timetable Management')">{{ __('create_timetable') }} </a>
                                 </li>
                             @endcan
 
                             @can('timetable-list')
                                 <li class="nav-item">
-                                    <a href="{{ route('timetable.teacher.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Timetable Management')">
+                                    <a href="{{ route('timetable.teacher.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Timetable Management')">
                                         {{ __('teacher_timetable') }}
                                     </a>
                                 </li>
@@ -217,23 +223,23 @@
                         </ul>
                     </div>
                 </li>
-            @endcanany
+            @endif
         @endif
 
         {{-- Holiday --}}
-        @canany(['holiday-create', 'holiday-list'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Holiday Management') : Auth::user()->canany(['holiday-create', 'holiday-list']))
             <li class="nav-item">
                 @can('holiday-list')
-                    <a href="{{ route('holiday.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Holiday Management')">
+                    <a href="{{ route('holiday.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Holiday Management')">
                         <i class="fa fa-calendar-check-o menu-icon"></i>
                         <span class="menu-title">{{ __('holiday_list') }}</span>
                     </a>
                 @endcan
             </li>
-        @endcanany
+        @endif
 
         {{-- Library Management --}}
-        @canany(['book-list', 'book-create', 'book-edit', 'book-delete', 'book-issue-list', 'book-issue-create', 'book-report-view'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Library Management') : Auth::user()->canany(['book-list', 'book-create', 'book-edit', 'book-delete', 'book-issue-list', 'book-issue-create', 'book-report-view']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#library-menu" aria-expanded="false" aria-controls="library-menu" data-access="@hasFeatureAccess('Library Management')">
                     <i class="fa fa-book menu-icon"></i>
@@ -244,26 +250,26 @@
                     <ul class="nav flex-column sub-menu">
                         @can('book-list')
                             <li class="nav-item">
-                                <a href="{{ route('library.books.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Library Management')">{{ __('books') }}</a>
+                                <a href="{{ route('library.books.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Library Management')">{{ __('books') }}</a>
                             </li>
                         @endcan
                         @canany(['book-issue-list', 'book-issue-create'])
                             <li class="nav-item">
-                                <a href="{{ route('library.issues.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Library Management')">{{ __('book_issues') }}</a>
+                                <a href="{{ route('library.issues.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Library Management')">{{ __('book_issues') }}</a>
                             </li>
                         @endcanany
                         @can('book-report-view')
                             <li class="nav-item">
-                                <a href="{{ route('library.reports') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Library Management')">{{ __('library_reports') }}</a>
+                                <a href="{{ route('library.reports') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Library Management')">{{ __('library_reports') }}</a>
                             </li>
                         @endcan
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- Hostel Management --}}
-        @canany(['hostel-list', 'hostel-create', 'room-list', 'room-create', 'hostel-allocation-list', 'hostel-allocation-create', 'hostel-report-view'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Hostel Management') : Auth::user()->canany(['hostel-list', 'hostel-create', 'room-list', 'room-create', 'hostel-allocation-list', 'hostel-allocation-create', 'hostel-report-view']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#hostel-menu" aria-expanded="false" aria-controls="hostel-menu" data-access="@hasFeatureAccess('Hostel Management')">
                     <i class="fa fa-building menu-icon"></i>
@@ -274,32 +280,31 @@
                     <ul class="nav flex-column sub-menu">
                         @can('hostel-list')
                             <li class="nav-item">
-                                <a href="{{ route('hostel.hostels.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('hostels') }}</a>
+                                <a href="{{ route('hostel.hostels.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('hostels') }}</a>
                             </li>
                         @endcan
                         @can('room-list')
                             <li class="nav-item">
-                                <a href="{{ route('hostel.rooms.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('rooms') }}</a>
+                                <a href="{{ route('hostel.rooms.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('rooms') }}</a>
                             </li>
                         @endcan
                         @can('hostel-allocation-list')
                             <li class="nav-item">
-                                <a href="{{ route('hostel.allocations.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('allocations') }}</a>
+                                <a href="{{ route('hostel.allocations.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('allocations') }}</a>
                             </li>
                         @endcan
                         @can('hostel-report-view')
                             <li class="nav-item">
-                                <a href="{{ route('hostel.reports') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('hostel_reports') }}</a>
+                                <a href="{{ route('hostel.reports') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Hostel Management')">{{ __('hostel_reports') }}</a>
                             </li>
                         @endcan
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- subject lesson --}}
-        @canany(['lesson-list', 'lesson-create', 'lesson-edit', 'lesson-delete', 'topic-list', 'topic-create',
-            'topic-edit', 'topic-delete'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Lesson Management') : Auth::user()->canany(['lesson-list', 'lesson-create', 'lesson-edit', 'lesson-delete', 'topic-list', 'topic-create', 'topic-edit', 'topic-delete']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#subject-lesson-menu" aria-expanded="false" aria-controls="subject-lesson-menu" data-access="@hasFeatureAccess('Lesson Management')">
                     <i class="fa fa-book menu-icon"></i>
@@ -310,22 +315,22 @@
                     <ul class="nav flex-column sub-menu">
                         @canany(['lesson-list', 'lesson-create', 'lesson-edit', 'lesson-delete'])
                             <li class="nav-item">
-                                <a href="{{ url('lesson') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Lesson Management')"> {{ __('create_lesson') }}</a>
+                                <a href="{{ url('lesson') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Lesson Management')"> {{ __('create_lesson') }}</a>
                             </li>
                         @endcanany
 
                         @canany(['topic-list', 'topic-create', 'topic-edit', 'topic-delete'])
                             <li class="nav-item">
-                                <a href="{{ url('lesson-topic') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Lesson Management')"> {{ __('create_topic') }}</a>
+                                <a href="{{ url('lesson-topic') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Lesson Management')"> {{ __('create_topic') }}</a>
                             </li>
                         @endcanany
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- student assignment --}}
-        @canany(['assignment-create', 'assignment-submission'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Assignment Management') : Auth::user()->canany(['assignment-create', 'assignment-submission']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#student-assignment-menu" aria-expanded="false"
                    aria-controls="student-assignment-menu" data-access="@hasFeatureAccess('Assignment Management')">
@@ -337,14 +342,14 @@
                     <ul class="nav flex-column sub-menu">
                         @can('assignment-create')
                             <li class="nav-item">
-                                <a href="{{ route('assignment.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Assignment Management')">
+                                <a href="{{ route('assignment.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Assignment Management')">
                                     {{ __('create_assignment') }}
                                 </a>
                             </li>
                         @endcan
                         @can('assignment-submission')
                             <li class="nav-item">
-                                <a href="{{ route('assignment.submission') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Assignment Management')">
+                                <a href="{{ route('assignment.submission') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Assignment Management')">
                                     {{ __('assignment_submission') }}
                                 </a>
                             </li>
@@ -352,51 +357,63 @@
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- Virtual Classroom --}}
-        <li class="nav-item">
-            <a class="nav-link" data-toggle="collapse" href="#virtual-classroom-menu" aria-expanded="false"
-               aria-controls="virtual-classroom-menu">
-                <i class="fa fa-video menu-icon"></i>
-                <span class="menu-title">{{ __('Virtual Classroom') }}</span>
-                <i class="menu-arrow"></i>
-            </a>
-            <div class="collapse" id="virtual-classroom-menu">
-                <ul class="nav flex-column sub-menu">
-                    <li class="nav-item">
-                        <a href="{{ route('virtual-classroom.index') }}" class="nav-link">
-                            {{ __('All Sessions') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('virtual-classroom.create') }}" class="nav-link">
-                            {{ __('Create Session') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('virtual-classroom.index', ['status' => 'scheduled']) }}" class="nav-link">
-                            {{ __('Upcoming Sessions') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('virtual-classroom.index', ['status' => 'live']) }}" class="nav-link">
-                            {{ __('Live Classes') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('virtual-classroom.reports') }}" class="nav-link">
-                            {{ __('Reports') }}
-                        </a>
-                    </li>
-                </ul>
-            </div>
-        </li>
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Virtual Classroom') : Auth::user()->canany(['virtual-classroom-list', 'virtual-classroom-create']))
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="collapse" href="#virtual-classroom-menu" aria-expanded="false"
+                   aria-controls="virtual-classroom-menu" data-access="@hasFeatureAccess('Virtual Classroom')">
+                    <i class="fa fa-video menu-icon"></i>
+                    <span class="menu-title">{{ __('Virtual Classroom') }}</span>
+                    <i class="menu-arrow"></i>
+                </a>
+                <div class="collapse" id="virtual-classroom-menu">
+                    <ul class="nav flex-column sub-menu">
+                        @can('virtual-classroom-list')
+                            <li class="nav-item">
+                                <a href="{{ route('virtual-classroom.index') }}" class="nav-link">
+                                    {{ __('All Sessions') }}
+                                </a>
+                            </li>
+                        @endcan
+                        @can('virtual-classroom-create')
+                            <li class="nav-item">
+                                <a href="{{ route('virtual-classroom.create') }}" class="nav-link">
+                                    {{ __('Create Session') }}
+                                </a>
+                            </li>
+                        @endcan
+                        @can('virtual-classroom-list')
+                            <li class="nav-item">
+                                <a href="{{ route('virtual-classroom.index', ['status' => 'scheduled']) }}" class="nav-link">
+                                    {{ __('Upcoming Sessions') }}
+                                </a>
+                            </li>
+                        @endcan
+                        @can('virtual-classroom-list')
+                            <li class="nav-item">
+                                <a href="{{ route('virtual-classroom.index', ['status' => 'live']) }}" class="nav-link">
+                                    {{ __('Live Classes') }}
+                                </a>
+                            </li>
+                        @endcan
+                        @can('virtual-classroom-reports')
+                            <li class="nav-item">
+                                <a href="{{ route('virtual-classroom.reports') }}" class="nav-link">
+                                    {{ __('Reports') }}
+                                </a>
+                            </li>
+                        @endcan
+                    </ul>
+                </div>
+            </li>
+        @endif
 
         {{-- Slider --}}
         @can('slider-create')
             <li class="nav-item">
-                <a href="{{ route('sliders.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Slider Management')">
+                <a href="{{ route('sliders.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Slider Management')">
                     <i class="fa fa-list menu-icon"></i>
                     <span class="menu-title">{{ __('sliders') }}</span>
                 </a>
@@ -405,7 +422,7 @@
 
         @canany(['notification-create','notification-list','notification-delete'])
             <li class="nav-item">
-                <a href="{{ route('notifications.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Announcement Management')">
+                <a href="{{ route('notifications.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Announcement Management')">
                     <i class="fa fa-bell menu-icon"></i>
                     <span class="menu-title">{{ __('notification') }}</span>
                 </a>
@@ -413,7 +430,7 @@
         @endcanany
 
         {{-- Attendance --}}
-        @canany(['class-teacher','attendance-list','attendance-create','attendance-edit','attendance-delete'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Attendance Management') : Auth::user()->canany(['class-teacher','attendance-list','attendance-create','attendance-edit','attendance-delete']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#attendance-menu" data-access="@hasFeatureAccess('Attendance Management')" aria-expanded="false"
                    aria-controls="attendance-menu">
@@ -425,7 +442,7 @@
                     <ul class="nav flex-column sub-menu">
                         @canany(['class-teacher','attendance-create'])
                             <li class="nav-item">
-                                <a href="{{ route('attendance.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Attendance Management')">
+                                <a href="{{ route('attendance.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Attendance Management')">
                                     {{ __('add_attendance') }}
                                 </a>
                             </li>
@@ -434,19 +451,19 @@
                         {{-- view attendance --}}
                         @canany(['class-teacher','attendance-list'])
                             <li class="nav-item">
-                                <a href="{{ route('attendance.view') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Attendance Management')">
+                                <a href="{{ route('attendance.view') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Attendance Management')">
                                     {{ __('view_attendance') }}
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('attendance.month') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Attendance Management')">
+                                <a href="{{ route('attendance.month') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Attendance Management')">
                                     {{ __('month_wise') }}
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('attendance.scan') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Attendance Management')">
+                                <a href="{{ route('attendance.scan') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Attendance Management')">
                                     {{ __('scan_attendance') }}
                                 </a>
                             </li>
@@ -454,12 +471,12 @@
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- announceent --}}
         @can('announcement-create')
             <li class="nav-item">
-                <a href="{{ route('announcement.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Announcement Management')">
+                <a href="{{ route('announcement.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Announcement Management')">
                     <i class="fa fa-bullhorn menu-icon"></i>
                     <span class="menu-title">{{ __('announcement') }}</span>
                 </a>
@@ -467,7 +484,7 @@
         @endcan
 
         {{-- exam --}}
-        @canany(['exam-create', 'exam-upload-marks', 'grade-create', 'exam-result','view-exam-marks'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Exam Management') : Auth::user()->canany(['exam-create', 'exam-upload-marks', 'grade-create', 'exam-result','view-exam-marks']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#exam-menu" aria-expanded="false"
                    aria-controls="exam-menu" data-access="@hasFeatureAccess('Exam Management')">
@@ -479,13 +496,13 @@
                     <ul class="nav flex-column sub-menu">
                         @can('exam-create')
                             <li class="nav-item">
-                                <a href="{{ route('exams.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_offline_exam') }}
+                                <a href="{{ route('exams.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_offline_exam') }}
                                 </a>
                             </li>
                         @endcan
                         @can('view-exam-marks')
                             <li class="nav-item">
-                                <a href="{{ route('exam.view-marks') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('Unpublished Exam Marks') }}
+                                <a href="{{ route('exam.view-marks') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('Unpublished Exam Marks') }}
                                 </a>
                             </li>
                         @endcan
@@ -493,19 +510,19 @@
                         @can('exam-upload-marks')
 
                             <li class="nav-item">
-                                <a href="{{ route('exams.timetable') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('exams.timetable') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('timetable') }}
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('exams.upload-marks') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('exams.upload-marks') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('upload') }} {{ __('Exam Marks') }}
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('exam.bulk-upload-marks') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('exam.bulk-upload-marks') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('bulk upload') }} {{ __('Exam Marks') }}
                                 </a>
                             </li>
@@ -513,7 +530,7 @@
                         @endcan
                         @can('exam-result')
                             <li class="nav-item">
-                                <a href="{{ route('exams.get-result') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('exams.get-result') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('Published Exam Result') }}
                                 </a>
                             </li>
@@ -521,7 +538,7 @@
 
                         @can('grade-create')
                             <li class="nav-item">
-                                <a href="{{ route('exam.grade.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('exam.grade.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('exam_grade') }}
                                 </a>
                             </li>
@@ -529,10 +546,10 @@
                     </ul>
                 </div>
             </li>
-        @endcan
+        @endif
 
         {{-- Online Exam --}}
-        @canany(['online-exam-create', 'online-exam-list', 'online-exam-edit', 'online-exam-delete'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Exam Management') : Auth::user()->canany(['online-exam-create', 'online-exam-list', 'online-exam-edit', 'online-exam-delete']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#online-exam-menu" aria-expanded="false"
                    aria-controls="online-exam-menu" data-access="@hasFeatureAccess('Exam Management')">
@@ -545,13 +562,13 @@
                         @can('online-exam-list')
                             <li class="nav-item">
 
-                                <a href="{{ route('online-exam.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_online_exam') }}
+                                <a href="{{ route('online-exam.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_online_exam') }}
                                 </a>
                             </li>
                         @endcan
                         @can('online-exam-create')
                             <li class="nav-item">
-                                <a href="{{ route('online-exam-question.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_questions') }}
+                                <a href="{{ route('online-exam-question.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')"> {{ __('manage_questions') }}
                                 </a>
                             </li>
                         @endcan
@@ -562,7 +579,7 @@
 
         {{-- Fees --}}
 
-        @canany(['fees-list', 'fees-type-list', 'fees-classes-list', 'fees-paid'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Fees Management') : Auth::user()->canany(['fees-list', 'fees-type-list', 'fees-classes-list', 'fees-paid']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#fees-menu" aria-expanded="false" aria-controls="fees-menu" data-access="@hasFeatureAccess('Fees Management')">
                     <i class="fa fa-dollar menu-icon"></i>
@@ -597,10 +614,10 @@
                     </ul>
                 </div>
             </li>
-        @endcan
+        @endif
 
         {{-- Transport Management --}}
-        @canany(['transport-route-list', 'transport-allocation-list', 'transport-report-view'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Transport Management') : Auth::user()->canany(['transport-route-list', 'transport-allocation-list', 'transport-report-view']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#transport-menu" data-access="@hasFeatureAccess('Transport Management')" aria-expanded="false"
                    aria-controls="transport-menu">
@@ -612,28 +629,28 @@
                     <ul class="nav flex-column sub-menu">
                         @can('transport-route-list')
                             <li class="nav-item">
-                                <a href="{{ route('transport.routes.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Transport Management')">
+                                <a href="{{ route('transport.routes.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Transport Management')">
                                     {{ __('Routes') }}
                                 </a>
                             </li>
                         @endcan
                         @can('transport-allocation-list')
                             <li class="nav-item">
-                                <a href="{{ route('transport.allocations.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Transport Management')">
+                                <a href="{{ route('transport.allocations.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Transport Management')">
                                     {{ __('Student Allocations') }}
                                 </a>
                             </li>
                         @endcan
                         @can('transport-report-view')
                             <li class="nav-item">
-                                <a href="{{ route('transport.reports.fee_collection') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Transport Management')">
+                                <a href="{{ route('transport.reports.fee_collection') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Transport Management')">
                                     {{ __('Fee Collection') }}
                                 </a>
                             </li>
                         @endcan
                         @can('transport-report-view')
                             <li class="nav-item">
-                                <a href="{{ route('transport.reports.unpaid_fees') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Transport Management')">
+                                <a href="{{ route('transport.reports.unpaid_fees') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Transport Management')">
                                     {{ __('Unpaid Fees') }}
                                 </a>
                             </li>
@@ -641,10 +658,10 @@
                     </ul>
                 </div>
             </li>
-        @endcanany
+        @endif
 
         {{-- Leave --}}
-        @canany(['leave-list', 'leave-create', 'leave-edit', 'leave-delete'])
+        @if(Auth::user()->hasRole('School Admin') ? \App\Services\FeaturesService::hasFeature('Staff Leave Management') : Auth::user()->canany(['leave-list', 'leave-create', 'leave-edit', 'leave-delete']))
             <li class="nav-item">
                 <a class="nav-link" data-toggle="collapse" href="#staff-leave-menu" data-access="@hasFeatureAccess('Staff Leave Management')" aria-expanded="false"
                    aria-controls="staff-leave-menu">
@@ -655,13 +672,13 @@
                 <div class="collapse" id="staff-leave-menu">
                     <ul class="nav flex-column sub-menu">
                         <li class="nav-item">
-                            <a href="{{ route('leave.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Leave Management')">
+                            <a href="{{ route('leave.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Leave Management')">
                                 {{ __('apply_leave') }}
                             </a>
                         </li>
 
                         <li class="nav-item">
-                            <a href="{{ route('leave.report') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Leave Management')">
+                            <a href="{{ route('leave.report') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Leave Management')">
                                 {{ __('leave_report') }}
                             </a>
                         </li>
@@ -695,9 +712,9 @@
             </li>
         @endrole
 
-        @if (Auth::user()->school_id && Auth::user()->staff)
+        @if(Session::get('auth_school_id') && Session::get('auth_user_id'))
             <li class="nav-item">
-                <a href="{{ route('payroll.slip.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">
+                <a href="{{ route('payroll.slip.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">
                     <i class="fa fa-money menu-icon"></i>
                     <span class="menu-title">{{ __('payroll') }} {{ __('slips') }}</span>
                 </a>
@@ -800,13 +817,13 @@
                     <ul class="nav flex-column sub-menu">
                         @canany(['expense-category-create', 'expense-category-list','expense-category-edit', 'expense-category-delete'])
                             <li class="nav-item">
-                                <a href="{{ route('expense-category.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">{{ __('manage_category') }} </a>
+                                <a href="{{ route('expense-category.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">{{ __('manage_category') }} </a>
                             </li>
                         @endcanany
 
                         @canany(['expense-create', 'expense-list','expense-edit', 'expense-delete'])
                             <li class="nav-item">
-                                <a href="{{ route('expense.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">
+                                <a href="{{ route('expense.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">
                                     {{ __('manage_expense') }}
                                 </a>
                             </li>
@@ -819,7 +836,7 @@
         {{-- Payroll --}}
         @canany(['payroll-create', 'payroll-list', 'payroll-edit', 'payroll-delete','payroll-settings-list','payroll-settings-create','payroll-settings-edit', 'payroll-settings-delete'])
             <li class="nav-item">
-                <a href="#payroll-menu" class="nav-link" data-toggle="collapse" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">
+                <a href="#payroll-menu" class="nav-link" data-toggle="collapse" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">
                     <i class="fa fa-credit-card-alt menu-icon"></i>
                     <span class="menu-title">{{ __('payroll') }}</span>    
                     <i class="menu-arrow"></i>       
@@ -828,13 +845,13 @@
                     <ul class="nav flex-column sub-menu">
                         @canany(['payroll-create', 'payroll-list', 'payroll-edit', 'payroll-delete'])
                             <li class="nav-item">
-                                <a href="{{ route('payroll.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">{{ __('manage_payroll') }} </a>
+                                <a href="{{ route('payroll.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">{{ __('manage_payroll') }} </a>
                             </li>
                         @endcanany
 
                         @canany(['payroll-settings-list','payroll-settings-create','payroll-settings-edit', 'payroll-settings-delete'])
                             <li class="nav-item">
-                                <a href="{{ route('payroll-setting.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Expense Management')">
+                                <a href="{{ route('payroll-setting.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Expense Management')">
                                     {{ __('payroll_setting') }}
                                 </a>
                             </li>
@@ -857,7 +874,7 @@
         {{-- gallery --}}
         @canany(['gallery-create','gallery-list','gallery-edit','gallery-delete'])
             <li class="nav-item">
-                <a href="{{ route('gallery.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('School Gallery Management')">
+                <a href="{{ route('gallery.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('School Gallery Management')">
                     <i class="fa fa-picture-o menu-icon"></i>
                     <span class="menu-title">{{ __('gallery') }}</span>
                 </a>
@@ -877,7 +894,7 @@
                         
                         @canany(['certificate-create', 'certificate-list','certificate-edit', 'certificate-delete'])
                             <li class="nav-item">
-                                <a href="{{ url('certificate-template') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
+                                <a href="{{ url('certificate-template') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
                                     {{ __('certificate_template') }}
                                 </a>
                             </li>
@@ -885,7 +902,7 @@
 
                         @canany(['certificate-list'])
                             <li class="nav-item">
-                                <a href="{{ url('certificate') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
+                                <a href="{{ url('certificate') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
                                     {{ __('student_certificate') }}
                                 </a>
                             </li>
@@ -893,7 +910,7 @@
 
                         @canany(['certificate-list'])
                             <li class="nav-item">
-                                <a href="{{ url('certificate/staff-certificate') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
+                                <a href="{{ url('certificate/staff-certificate') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">
                                     {{ __('staff_certificate') }}
                                 </a>
                             </li>
@@ -901,17 +918,17 @@
 
                         @can('id-card-settings')
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ route('id-card-settings') }}" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('id_card_settings') }}</a>
+                                <a class="nav-link" href="{{ route('id-card-settings') }}" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('id_card_settings') }}</a>
                             </li>
                         @endcan
 
                         @canany(['student-list', 'class-teacher'])
-                            <li class="nav-item"><a href="{{ route('students.generate-id-card-index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('student_id_card') }}</a></li>
+                            <li class="nav-item"><a href="{{ route('students.generate-id-card-index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('student_id_card') }}</a></li>
                         @endcanany
 
                         @can('staff-list')
                                 <li class="nav-item">
-                                    <a href="{{ route('staff.id-card') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('staff_id_card') }}</a>
+                                    <a href="{{ route('staff.id-card') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('ID Card - Certificate Generation')">{{ __('staff_id_card') }}</a>
                                 </li>
                             @endcan
                     </ul>
@@ -919,7 +936,7 @@
             </li>
         @endcanany
 
-        @if (Auth::user()->school_id)
+        @if(Session::get('auth_school_id'))
             @canany(['role-list', 'role-create', 'role-edit', 'role-delete', 'staff-list', 'staff-create', 'staff-edit','staff-delete'])
                 <li class="nav-item">
                     <a class="nav-link" data-toggle="collapse" href="#staff-management" aria-expanded="false" aria-controls="staff-management-menu" data-access="@hasFeatureAccess('Staff Management')">
@@ -931,17 +948,17 @@
                         <ul class="nav flex-column sub-menu">
                             @canany(['role-list', 'role-create', 'role-edit', 'role-delete'])
                                 <li class="nav-item">
-                                    <a href="{{ route('roles.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('Role & Permission') }}</a>
+                                    <a href="{{ route('roles.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('Role & Permission') }}</a>
                                 </li>
                             @endcanany
                             @canany(['staff-list', 'staff-create', 'staff-edit', 'staff-delete'])
                                 <li class="nav-item">
-                                    <a href="{{ route('staff.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('staff') }}</a>
+                                    <a href="{{ route('staff.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('staff') }}</a>
                                 </li>
                             @endcanany
                             @canany(['staff-list', 'staff-create', 'staff-edit', 'staff-delete'])
                                 <li class="nav-item">
-                                    <a href="{{ route('staff.create-bulk-upload') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('bulk upload') }}</a>
+                                    <a href="{{ route('staff.create-bulk-upload') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Management')">{{ __('bulk upload') }}</a>
                                 </li>
                             @endcanany
                         </ul>
@@ -962,10 +979,10 @@
 
                             @can('approve-leave')
                                 <li class="nav-item">
-                                    <a href="{{ route('leave.request') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('staff') }} {{ __('leave') }}</a>
+                                    <a href="{{ route('leave.request') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('staff') }} {{ __('leave') }}</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{{ url('leave/report') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('leave_report') }}</a>
+                                    <a href="{{ url('leave/report') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('leave_report') }}</a>
                                 </li>
                             @endcan
                         </ul>
@@ -1098,12 +1115,12 @@
                 <div class="collapse" id="web_settings">
                     <ul class="nav flex-column sub-menu">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ route('school.web-settings.index') }}" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Website Management')">{{ __('content') }}</a>
+                            <a class="nav-link" href="{{ route('school.web-settings.index') }}" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Website Management')">{{ __('content') }}</a>
                         </li>
                         
                         @canany(['faqs-create','faqs-list','faqs-edit','faqs-delete'])
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ route('faqs.index') }}" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Website Management')">{{ __('faqs') }}</a>
+                                <a class="nav-link" href="{{ route('faqs.index') }}" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Website Management')">{{ __('faqs') }}</a>
                             </li>
                         @endcanany
                     </ul>
@@ -1141,7 +1158,7 @@
                             </li>
 
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ route('leave-master.index') }}" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('leave') }} {{ __('settings') }}</a>
+                                <a class="nav-link" href="{{ route('leave-master.index') }}" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Staff Leave Management')">{{ __('leave') }} {{ __('settings') }}</a>
                             </li>
                         @endcan
 
@@ -1182,14 +1199,14 @@
 
                         {{-- @can('fees-config')
                             <li class="nav-item">
-                                <a href="{{ route('fees.config.index') }}" class="nav-link" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Fees Management')">
+                                <a href="{{ route('fees.config.index') }}" class="nav-link" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Fees Management')">
                                     {{ __('Fees Settings') }}</a>
                             </li>
                         @endcan --}}
 
                         @can('school-setting-manage')
                             <li class="nav-item">
-                                <a href="{{ route('school-settings.online-exam.index') }}" class="nav-link text-wrap" data-name="{{ Auth::user()->getRoleNames()[0] }}" data-access="@hasFeatureAccess('Exam Management')">
+                                <a href="{{ route('school-settings.online-exam.index') }}" class="nav-link text-wrap" data-name="{{ Session::get('auth_user_name') }}" data-access="@hasFeatureAccess('Exam Management')">
                                     {{ __('online_exam_terms_condition') }}
                                 </a>
                             </li>
@@ -1291,7 +1308,7 @@
             </li>
         @endcanany
 
-        @if (Auth::user()->hasRole('Super Admin'))
+        @if(Session::get('auth_user_id'))
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('system-update.index') }}">
                     <i class="fa fa-cloud-download menu-icon"></i>
@@ -1300,7 +1317,7 @@
             </li>
         @endif
 
-        @if (Auth::user()->hasRole(['Super Admin','School Admin']))
+        @if(Session::get('auth_user_id'))
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('database-backup.index') }}">
                     <i class="fa fa-database menu-icon"></i>
@@ -1309,7 +1326,7 @@
             </li>
         @endif
 
-        @if (Auth::user()->hasRole(['Super Admin']))
+        @if(Session::get('auth_user_id'))
             <li class="nav-item">
                 <a class="nav-link" href="https://elimugrid.com/docs/" target="_blank">
                     <i class="fa fa-book menu-icon"></i>

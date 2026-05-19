@@ -46,10 +46,10 @@ class TransportReportController extends Controller
                 ->leftJoin('transport_allocations as ta', 'tfc.allocation_id', '=', 'ta.id')
                 ->leftJoin('students as s', 'tfc.student_id', '=', 's.id')
                 ->leftJoin('users as u', 's.user_id', '=', 'u.id')
-                ->leftJoin('class_schools as cs', 's.class_id', '=', 'cs.id')
+                ->leftJoin('classes as cs', 's.class_id', '=', 'cs.id')
                 ->leftJoin('transport_routes as tr', 'tfc.route_id', '=', 'tr.id')
                 ->whereNull('tfc.deleted_at')
-                ->where('tfc.school_id', Auth::user()->school_id)
+                ->where('tfc.school_id', Session::get('auth_school_id')) // Use custom session
                 ->select(
                     'tfc.*',
                     'u.first_name',
@@ -187,12 +187,12 @@ class TransportReportController extends Controller
                 ->leftJoin('transport_allocations as ta', 'tfc.allocation_id', '=', 'ta.id')
                 ->leftJoin('students as s', 'tfc.student_id', '=', 's.id')
                 ->leftJoin('users as u', 's.user_id', '=', 'u.id')
-                ->leftJoin('class_schools as cs', 's.class_id', '=', 'cs.id')
+                ->leftJoin('classes as cs', 's.class_id', '=', 'cs.id')
                 ->leftJoin('class_sections as csec', 's.class_section_id', '=', 'csec.id')
                 ->leftJoin('transport_routes as tr', 'tfc.route_id', '=', 'tr.id')
                 ->where('tfc.status', 'pending')
                 ->whereNull('tfc.deleted_at')
-                ->where('tfc.school_id', Auth::user()->school_id)
+                ->where('tfc.school_id', Session::get('auth_school_id')) // Use custom session
                 ->select(
                     'tfc.*',
                     'u.first_name',

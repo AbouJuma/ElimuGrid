@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use App\Traits\TenantModel;
 
 class Fee extends Model {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes, TenantModel;
 
     protected $fillable = [
         'name',

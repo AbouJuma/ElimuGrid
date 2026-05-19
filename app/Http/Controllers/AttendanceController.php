@@ -68,7 +68,7 @@ class AttendanceController extends Controller
             'date'             => 'required',
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $attendanceData = array();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $student_ids = array();
@@ -90,25 +90,42 @@ class AttendanceController extends Controller
             $this->attendance->upsert($attendanceData, ["id"], ["class_section_id", "student_id", "session_year_id", "type", "date"]);
 
             if ($request->absent_notification) {
-                $user = $this->student->builder()->whereIn('user_id', $student_ids)->pluck('guardian_id');
+                $guardianIds = $this->student->builder()
+                    ->whereIn('user_id', $student_ids)
+                    ->pluck('guardian_id')
+                    ->unique()
+                    ->toArray();
                 $date = Carbon::parse(date('Y-m-d', strtotime($request->date)))->format('F jS, Y');
                 $title = 'Absent';
                 $body = 'Your child is absent on ' . $date;
                 $type = "attendance";
 
-                send_notification($user, $title, $body, $type);
+                // Send push notification if there are guardians with FCM tokens
+                if (!empty($guardianIds)) {
+                    send_notification($guardianIds, $title, $body, $type);
+                    // Persist notification record for audit and visibility in notification list
+                    $notification = \App\Models\Notification::create([
+                        'title' => $title,
+                        'message' => $body,
+                        'send_to' => 'Guardian',
+                        'session_year_id' => $sessionYear->id,
+                        'school_id' => auth()->user()->school_id ?? null,
+                    ]);
+                    // Add tracking entry
+                    $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Notification', $notification->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
+                }
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Attendance Controller -> Store method");
                 ResponseService::errorResponse();
             }
@@ -373,7 +390,7 @@ class AttendanceController extends Controller
     public function scanAttendance()
     {
         ResponseService::noFeatureThenRedirect('Attendance Management');
-        ResponseService::noAnyPermissionThenRedirect(['attendance-create', 'attendance-edit']);
+        ResponseService::noAnyPermissionThenRedirect(['attendance-create', 'attendance-edit', 'attendance-list', 'class-teacher']);
         
         $class_sections = $this->classSection->builder()->ClassTeacher()->with('class', 'class.stream', 'section', 'medium')->get();
         
@@ -382,8 +399,8 @@ class AttendanceController extends Controller
 
     public function markAttendanceByBarcode(Request $request)
     {
-        ResponseService::noFeatureThenRedirect('Attendance Management');
-        ResponseService::noAnyPermissionThenRedirect(['attendance-create', 'attendance-edit']);
+        ResponseService::noFeatureThenSendJson('Attendance Management');
+        ResponseService::noAnyPermissionThenSendJson(['attendance-create', 'attendance-edit', 'class-teacher', 'attendance-list']);
         
         try {
             $validator = Validator::make($request->all(), [

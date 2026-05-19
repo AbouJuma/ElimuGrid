@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class Expense extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['category_id', 'ref_no', 'staff_id', 'month', 'year', 'title', 'description', 'amount', 'date', 'school_id', 'session_year_id', 'basic_salary', 'paid_leaves'];
 
     protected $appends = ['taken_leaves'];

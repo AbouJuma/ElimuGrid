@@ -66,7 +66,7 @@ class LeaveMasterController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $day = implode(',',$request->holiday_days);
             $data = [
                 'leaves' => $request->leaves,
@@ -75,7 +75,7 @@ class LeaveMasterController extends Controller
             ];
 
             $this->leaveMaster->create($data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $e) {
             ResponseService::logErrorResponse($e, "LeaveMaster Controller -> Store Method");
@@ -163,7 +163,7 @@ class LeaveMasterController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $day = implode(',',$request->holiday_days);
             $data = [
                 'leaves' => $request->leaves,
@@ -172,7 +172,7 @@ class LeaveMasterController extends Controller
             ];
 
             $this->leaveMaster->update($id,$data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $e) {
             ResponseService::logErrorResponse($e, "LeaveMaster Controller -> Store Method");

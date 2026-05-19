@@ -22,9 +22,9 @@ class GeneralFunctionService
 
     public function reCaptcha($request)
     {
-        if (env('RECAPTCHA_SECRET_KEY') ?? '') {
+        if (config('services.recaptcha.secret') ?? '') {
             $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
-                'secret' => env('RECAPTCHA_SECRET_KEY'),
+                'secret' => config('services.recaptcha.secret'),
                 'response' => $request->input('g-recaptcha-response'),
                 'remoteip' => $request->ip(),
             ]);

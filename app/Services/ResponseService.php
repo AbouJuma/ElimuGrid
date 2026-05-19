@@ -158,12 +158,23 @@ class ResponseService {
      */
     #[NoReturn] public static function errorResponse(string $message = 'Error Occurred', $data = null, $code = null, $e = null) {
         $details = (!empty($e) && is_object($e)) ? $e->getMessage() . ' --> ' . $e->getFile() . ' At Line : ' . $e->getLine() : '';
+        
+        // Log the technical details even if we don't show them to the user
+        if ($details) {
+            Log::error("Response Error Details: " . $details);
+        }
+
+        $userMessage = trans($message);
+        if (config('app.debug') && $details) {
+            $userMessage .= ': ' . $details;
+        }
+
         $response = response()->json([
             'error'   => true,
-            'message' => trans($message) . ($details ? ': ' . $details : ''),
+            'message' => $userMessage,
             'data'    => $data,
             'code'    => $code ?? config('constants.RESPONSE_CODE.EXCEPTION_ERROR'),
-            'details' => $details
+            'details' => config('app.debug') ? $details : ''
         ], 200, ['Content-Type' => 'application/json']);
         $response->send();
         exit();

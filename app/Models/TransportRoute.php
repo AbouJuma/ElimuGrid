@@ -52,8 +52,8 @@ class TransportRoute extends Model
         return $this->hasOne(TransportFee::class, 'route_id')
             ->where('effective_from', '<=', now())
             ->where(function ($q) {
-                $q->whereNull('effective_until')
-                  ->orWhere('effective_until', '>=', now());
+                $q->whereNull('effective_to')
+                  ->orWhere('effective_to', '>=', now());
             })
             ->whereNull('deleted_at')
             ->latest();

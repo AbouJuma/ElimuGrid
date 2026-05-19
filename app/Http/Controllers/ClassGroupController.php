@@ -69,10 +69,10 @@ class ClassGroupController extends Controller
                 'class_ids' => implode(",",$request->class_ids),
             ];
             $this->classGroup->create($data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, "Class Group Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -160,10 +160,10 @@ class ClassGroupController extends Controller
                 $data['image'] = $request->file('image');
             }
             $this->classGroup->update($id,$data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (\Throwable $th) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($th, "Class Group Controller -> Update Method");
             ResponseService::errorResponse();
         }
@@ -177,12 +177,12 @@ class ClassGroupController extends Controller
         //
         ResponseService::noPermissionThenRedirect('class-group-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $this->classGroup->deleteById($id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (\Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Class Group Controller -> Destroy Method");
             ResponseService::errorResponse();
         }

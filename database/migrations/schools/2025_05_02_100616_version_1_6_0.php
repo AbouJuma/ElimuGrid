@@ -13,51 +13,63 @@ return new class extends Migration
     public function up(): void
     {
 
-        Schema::create('session_years_trackings', function (Blueprint $table) {
-            $table->id();
-            $table->string('modal_type');
-            $table->integer('modal_id');
-            
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('session_year_id')->constrained('session_years')->onDelete('cascade');
-            $table->foreignId('semester_id')->nullable()->constrained('semesters')->onDelete('cascade');
-            $table->foreignId('school_id')->constrained('schools')->onDelete('cascade');
-            
-            $table->timestamps();
-        });
+        try {
+            Schema::create('session_years_trackings', function (Blueprint $table) {
+                $table->id();
+                $table->string('modal_type');
+                $table->integer('modal_id');
+                
+                $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+                $table->foreignId('session_year_id')->constrained('session_years')->onDelete('cascade');
+                $table->foreignId('semester_id')->nullable()->constrained('semesters')->onDelete('cascade');
+                $table->foreignId('school_id')->constrained('schools')->onDelete('cascade');
+                
+                $table->timestamps();
+            });
+        } catch (\Exception $e) {}
         
         // 1. Create contact_inquiry table
-        Schema::create('contact_inquiry', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->string('email');
-            $table->string('subject');
-            $table->text('message');
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        try {
+            Schema::create('contact_inquiry', function (Blueprint $table) {
+                $table->id();
+                $table->string('name');
+                $table->string('email');
+                $table->string('subject');
+                $table->text('message');
+                $table->timestamps();
+                $table->softDeletes();
+            });
+        } catch (\Exception $e) {}
 
         // 2. Add amount_installment to fees_installments table
-        Schema::table('fees_installments', function (Blueprint $table) {
-            $table->double('installment_amount', 64, 4)->after('name')->default(0);
-        });
+        try {
+            Schema::table('fees_installments', function (Blueprint $table) {
+                $table->double('installment_amount', 64, 4)->after('name')->default(0);
+            });
+        } catch (\Exception $e) {}
         
         // 3. Add join_leave_year columns to students and staffs tables
-        Schema::table('students', function (Blueprint $table) {
-            $table->bigInteger('join_session_year_id')->nullable()->after('guardian_id');
-            $table->bigInteger('leave_session_year_id')->nullable()->after('join_session_year_id');
-        });
+        try {
+            Schema::table('students', function (Blueprint $table) {
+                $table->bigInteger('join_session_year_id')->nullable()->after('guardian_id');
+                $table->bigInteger('leave_session_year_id')->nullable()->after('join_session_year_id');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('staffs', function (Blueprint $table) {
-            $table->foreignId('session_year_id')->nullable()->after('joining_date')->constrained('session_years')->onDelete('cascade');
-            $table->bigInteger('join_session_year_id')->nullable()->after('session_year_id');
-            $table->bigInteger('leave_session_year_id')->nullable()->after('join_session_year_id');
-        });
+        try {
+            Schema::table('staffs', function (Blueprint $table) {
+                $table->foreignId('session_year_id')->nullable()->after('joining_date')->constrained('session_years')->onDelete('cascade');
+                $table->bigInteger('join_session_year_id')->nullable()->after('session_year_id');
+                $table->bigInteger('leave_session_year_id')->nullable()->after('join_session_year_id');
+            });
+        } catch (\Exception $e) {}
 
-        Schema::table('promote_students', function (Blueprint $table) {
-            $table->bigInteger('current_session_year_id')->nullable()->after('session_year_id');
-            $table->bigInteger('current_class_section_id')->nullable()->after('current_session_year_id');
-        });
+        try {
+            Schema::table('promote_students', function (Blueprint $table) {
+                $table->bigInteger('current_session_year_id')->nullable()->after('session_year_id');
+                $table->bigInteger('current_class_section_id')->nullable()->after('current_session_year_id');
+            });
+        } catch (\Exception $e) {}
 
         // mediums table
         // Schema::table('mediums', function (Blueprint $table) {

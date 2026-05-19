@@ -17,7 +17,7 @@ class TransportFee extends Model
         'amount',
         'billing_cycle',
         'effective_from',
-        'effective_until',
+        'effective_to',
         'description',
         'school_id'
     ];
@@ -25,7 +25,7 @@ class TransportFee extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'effective_from' => 'date',
-        'effective_until' => 'date',
+        'effective_to' => 'date',
     ];
 
     protected static function boot()
@@ -47,8 +47,8 @@ class TransportFee extends Model
     {
         return $query->where('effective_from', '<=', now())
             ->where(function ($q) {
-                $q->whereNull('effective_until')
-                  ->orWhere('effective_until', '>=', now());
+                $q->whereNull('effective_to')
+                  ->orWhere('effective_to', '>=', now());
             })
             ->whereNull('deleted_at');
     }

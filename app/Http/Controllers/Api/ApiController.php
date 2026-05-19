@@ -30,6 +30,7 @@ use App\Repositories\User\UserInterface;
 use App\Services\CachingService;
 use App\Services\Payment\PaymentService;
 use App\Services\ResponseService;
+use App\Services\SharedHostingTenantService;
 use App\Repositories\Fees\FeesInterface;
 use Auth;
 use DB;
@@ -48,7 +49,6 @@ use App\Rules\MaxFileSize;
 use App\Services\GeneralFunctionService;
 use Laravel\Sanctum\PersonalAccessToken;
 use App\Models\School;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
@@ -204,10 +204,7 @@ class ApiController extends Controller
             if ($schoolCode) {
                 $school = School::on('mysql')->where('code',$schoolCode)->first();
                 if ($school) {
-                    DB::setDefaultConnection('school');
-                    Config::set('database.connections.school.database', $school->database_name);
-                    DB::purge('school');
-                    DB::connection('school')->reconnect();
+                    SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                     DB::setDefaultConnection('school');
                     
                     $response = Password::sendResetLink(['email' => $request->email]);
@@ -475,7 +472,7 @@ class ApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $leaveMaster = $this->leaveMaster->builder()->where('session_year_id', $sessionYear->id)->first();
             
@@ -542,13 +539,13 @@ class ApiController extends Controller
             $body = $request->reason;
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Stored Successfully");
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
                 ResponseService::logErrorResponse($e);
@@ -627,13 +624,13 @@ class ApiController extends Controller
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $leave = $this->leave->findById($request->leave_id);
             if ($leave->status != 0) {
                 ResponseService::errorResponse("You cannot delete this leave");
             }
             $this->leave->deleteById($request->leave_id);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Deleted Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -949,7 +946,7 @@ class ApiController extends Controller
         $message = '';
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $chat = $this->chat->builder()
             ->where(function($q) use($request){
                 $q->where('sender_id', Auth::user()->id)->where('receiver_id',$request->to);
@@ -996,7 +993,7 @@ class ApiController extends Controller
                 
                 send_notification($user, $title, $body, $type);
                 
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse("Data Stored Successfully", $message);
             } else {
                 // Only send notification if no files attached
@@ -1007,18 +1004,18 @@ class ApiController extends Controller
                 
                 send_notification($user, $title, $body, $type);
                 
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse("Data Stored Successfully", $message);
             }
 
         } catch (\Throwable $th) {
             $notificationStatus = app(GeneralFunctionService::class)->wrongNotificationSetup($th);
             if ($notificationStatus) {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($th);
                 ResponseService::errorResponse();
             } else {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.", $message);
             }
         }
@@ -1404,10 +1401,7 @@ class ApiController extends Controller
                     $school = School::on('mysql')->where('code', $school_code)->first();
                     
                     if ($school) {
-                        DB::setDefaultConnection('school');
-                        Config::set('database.connections.school.database', $school->database_name);
-                        DB::purge('school');
-                        DB::connection('school')->reconnect();
+                        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                         DB::setDefaultConnection('school');
                          
                         $names = array('school_name', 'school_tagline','horizontal_logo');
@@ -1421,9 +1415,9 @@ class ApiController extends Controller
                         }
                        
                         $schoolDetails = array(
-                               'school_name' => $settings['school_name'],
-                               'school_tagline' => $settings['school_tagline'],
-                               'school_logo' => $settings['horizontal_logo'],
+                               'school_name' => $settings['school_name'] ?? '',
+                               'school_tagline' => $settings['school_tagline'] ?? '',
+                               'school_logo' => $settings['horizontal_logo'] ?? '',
                                'school_images' => $gallery_images ?? []
                         );
                        
@@ -1453,10 +1447,7 @@ class ApiController extends Controller
                 $school = School::on('mysql')->where('code', $school_code)->first();
                 
                 if ($school) {
-                    DB::setDefaultConnection('school');
-                    Config::set('database.connections.school.database', $school->database_name);
-                    DB::purge('school');
-                    DB::connection('school')->reconnect();
+                    SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                     DB::setDefaultConnection('school');
                      
                     $feesRemainderDuration = $this->schoolSettings->builder()->where('name','fees_remainder_duration')->value('data') ?? 2;

@@ -95,7 +95,7 @@ class NotificationController extends Controller
         }
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $sessionYear = $this->cache->getDefaultSessionYear();
             $roles = Role::whereNot('name','School Admin')->where('id',$request->roles)->pluck('name')->first();
             $data = [
@@ -125,17 +125,17 @@ class NotificationController extends Controller
             $body = $request->message;
             $type = 'Notification';
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             send_notification($notifyUser, $title, $body, $type, $customData); // Send Notification
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Notification Controller -> Store Method");
                 ResponseService::errorResponse();
             }

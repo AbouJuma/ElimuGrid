@@ -32,11 +32,11 @@ use App\Services\FeaturesService;
 use App\Services\GeneralFunctionService;
 use App\Services\Payment\PaymentService;
 use App\Services\ResponseService;
+use App\Services\SharedHostingTenantService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use JetBrains\PhpStorm\NoReturn;
@@ -114,10 +114,7 @@ class ParentApiController extends Controller {
         $school = School::on('mysql')->where('code',$request->school_code)->first();
 
         if ($school) {
-            DB::setDefaultConnection('school');
-            Config::set('database.connections.school.database', $school->database_name);
-            DB::purge('school');
-            DB::connection('school')->reconnect();
+            SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
             DB::setDefaultConnection('school');
         } else {
             ResponseService::errorResponse('Invalid Login Credentials', null, config('constants.RESPONSE_CODE.INVALID_LOGIN'));
@@ -1412,7 +1409,7 @@ class ParentApiController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $paymentConfigurations = $this->paymentConfigurations->builder()->where(['status' => 1, 'payment_method' => $request->payment_method])->first();
 
@@ -1563,7 +1560,7 @@ class ParentApiController extends Controller {
             if ($request->payment_method == "Flutterwave" || $request->payment_method == "Paystack") {
                 $this->paymentTransaction->update($paymentTransactionData->id, ['order_id' => $paymentIntent['order_id'] ?? null, 'school_id' => $schoolId]);
                 $paymentTransactionData = $this->paymentTransaction->findById($paymentTransactionData->id);
-                DB::commit();
+                DB::connection('mysql')->commit();
 
                 \Log::info("Payment Intent:", ['payment_intent' => $paymentIntent]);
                 
@@ -1586,11 +1583,11 @@ class ParentApiController extends Controller {
                     ...$paymentIntent->toArray(),
                     'payment_transaction_id' => $paymentTransactionData->id,
                 );
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse("", ["payment_intent" => $paymentGatewayDetails, "payment_transaction" => $paymentTransactionData]);
             }
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -1608,7 +1605,7 @@ class ParentApiController extends Controller {
             ResponseService::validationError($validator->errors()->first());
         }
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $parentId = Auth::user()->id;
             $studentData = Auth::user()->guardianRelationChild()->where('id', $request->child_id)->whereHas('user', function ($q) {
                 $q->whereNull('deleted_at');
@@ -1689,7 +1686,7 @@ class ParentApiController extends Controller {
             if ($request->payment_method == "Flutterwave" || $request->payment_method == "Paystack") {
                 $this->paymentTransaction->update($paymentTransactionData->id, ['order_id' => $paymentIntent['order_id'] ?? null, 'school_id' => $schoolId]);
                 $paymentTransactionData = $this->paymentTransaction->findById($paymentTransactionData->id);
-                DB::commit();
+                DB::connection('mysql')->commit();
 
                 \Log::info("Payment Intent:", ['payment_intent' => $paymentIntent]);
                 
@@ -1712,11 +1709,11 @@ class ParentApiController extends Controller {
                     ...$paymentIntent->toArray(),
                     'payment_transaction_id' => $paymentTransactionData->id,
                 );
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::successResponse("", ["payment_intent" => $paymentGatewayDetails, "payment_transaction" => $paymentTransactionData]);
             }
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -1845,13 +1842,13 @@ class ParentApiController extends Controller {
 //            ResponseService::validationError($validator->errors()->first());
 //        }
 //        try {
-//            DB::beginTransaction();
+//            DB::connection('mysql')->beginTransaction();
 //            $child = $this->student->findById($request->child_id);
 //            $this->paymentTransaction->update($request->payment_transaction_id, ['payment_id' => $request->payment_id, 'payment_signature' => $request->payment_signature, 'school_id' => $child->school_id]);
-//            DB::commit();
+//            DB::connection('mysql')->commit();
 //            ResponseService::successResponse("Data Updated Successfully");
 //        } catch (Throwable $e) {
-//            DB::rollBack();
+//            DB::connection('mysql')->rollBack();
 //            ResponseService::logErrorResponse($e);
 //            ResponseService::errorResponse();
 //        }
@@ -1875,7 +1872,7 @@ class ParentApiController extends Controller {
 //
 //            ResponseService::successResponse("", $fees_paid);
 //        } catch (Throwable $e) {
-//            DB::rollBack();
+//            DB::connection('mysql')->rollBack();
 //            ResponseService::logErrorResponse($e);
 //            ResponseService::errorResponse();
 //        }

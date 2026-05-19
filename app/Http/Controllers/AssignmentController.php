@@ -97,7 +97,7 @@ class AssignmentController extends Controller
             ]),
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             $sessionYear = $this->cache->getDefaultSessionYear();
 
@@ -215,15 +215,15 @@ class AssignmentController extends Controller
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Assignment', $assignment->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
         
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
             
             if (Str::contains($e->getMessage(), ['does not exist', 'file_get_contents'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollBack();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Assignment Controller -> Store Method");
                 ResponseService::errorResponse();
             }
@@ -371,7 +371,7 @@ class AssignmentController extends Controller
             ]), 
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // $sessionYearId = getSchoolSettings('session_year');
             $sessionYear = $this->cache->getDefaultSessionYear();
@@ -445,16 +445,16 @@ class AssignmentController extends Controller
             $assignment->save();
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e, "Assignment Controller -> Update Method");
                 ResponseService::errorResponse();
             }
@@ -571,7 +571,7 @@ class AssignmentController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $updateAssignmentSubmissionData = array(
                 'feedback' => $request->feedback,
                 'points'   => $request->status == 1 ? $request->points : 0,
@@ -596,16 +596,16 @@ class AssignmentController extends Controller
 
             send_notification($user, $title, $body, $type);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), [
                 'does not exist','file_get_contents'
             ])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Data Stored successfully. But App push notification not send.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
                 ResponseService::errorResponse();
             }

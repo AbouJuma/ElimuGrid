@@ -6,10 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-
+use App\Traits\TenantModel;
 
 class LessonTopic extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'name',

@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use JsonException;
+use App\Traits\TenantModel;
 
 class FormField extends Model {
     use HasFactory;
     use SoftDeletes;
+    use TenantModel;
 
     protected $fillable = [
         'name',
@@ -23,6 +25,7 @@ class FormField extends Model {
     ];
 
     protected $table = 'form_fields';
+    protected $connection = 'mysql';
 
     public function scopeOwner($query) {
         if(Auth::user()) {

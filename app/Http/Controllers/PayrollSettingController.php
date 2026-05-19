@@ -60,7 +60,7 @@ class PayrollSettingController extends Controller
         ]);
 
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [ 
                 'user_id' => Auth::user()->id, 
                 'name' => $request->name, 
@@ -73,10 +73,10 @@ class PayrollSettingController extends Controller
             $sessionYear = $this->cache->getDefaultSessionYear();
             $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\PayrollSetting', $payrollSetting->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Stored Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Allowance Controller -> Store Method");
             ResponseService::errorResponse();
         }
@@ -163,7 +163,7 @@ class PayrollSettingController extends Controller
             'percentage' => 'nullable|required_without_all:amount'
         ]);
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = [ 
                 'user_id' => Auth::user()->id, 
                 'name' => $request->name, 
@@ -173,10 +173,10 @@ class PayrollSettingController extends Controller
             ];
 
             $this->payrollSetting->update($id, $data);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Allowance Controller -> Update Method");
             ResponseService::errorResponse();
         }

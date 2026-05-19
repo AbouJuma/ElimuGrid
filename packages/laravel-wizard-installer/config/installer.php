@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\File;
+use dacoto\LaravelWizardInstaller\InstallHelper;
 
 return [
     'icon' => '/images/default/icon.png',
@@ -13,50 +13,50 @@ return [
         'php' => [
             'name' => 'PHP Version',
             'version' => '>= 8.0.0',
-            'check' => fn() => version_compare(PHP_VERSION, '8', '>')
+            'check' => [InstallHelper::class, 'checkPhpVersion']
         ],
         'pdo' => [
             'name' => 'PDO',
-            'check' => fn() => extension_loaded('pdo_mysql')
+            'check' => [InstallHelper::class, 'checkPdo']
         ],
         'mbstring' => [
             'name' => 'Mbstring extension',
-            'check' => fn() => extension_loaded('mbstring')
+            'check' => [InstallHelper::class, 'checkMbstring']
         ],
         'fileinfo' => [
             'name' => 'Fileinfo extension',
-            'check' => fn() => extension_loaded('fileinfo')
+            'check' => [InstallHelper::class, 'checkFileinfo']
         ],
         'openssl' => [
             'name' => 'OpenSSL extension',
-            'check' => fn() => extension_loaded('openssl')
+            'check' => [InstallHelper::class, 'checkOpenssl']
         ],
         'tokenizer' => [
             'name' => 'Tokenizer extension',
-            'check' => fn() => extension_loaded('tokenizer')
+            'check' => [InstallHelper::class, 'checkTokenizer']
         ],
         'json' => [
             'name' => 'Json extension',
-            'check' => fn() => extension_loaded('json')
+            'check' => [InstallHelper::class, 'checkJson']
         ],
         'curl' => [
             'name' => 'Curl extension',
-            'check' => fn() => extension_loaded('curl')
+            'check' => [InstallHelper::class, 'checkCurl']
         ]
     ],
 
     'folders' => [
         'storage.framework' => [
             'name' => base_path().DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'framework',
-            'check' => fn() => File::chmod('../storage/framework') >= 755
+            'check' => [InstallHelper::class, 'checkStorageFramework']
         ],
         'storage.logs' => [
             'name' => base_path().DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'logs',
-            'check' => fn() => File::chmod('../storage/logs') >= 755
+            'check' => [InstallHelper::class, 'checkStorageLogs']
         ],
         'storage.cache' => [
             'name' => base_path().DIRECTORY_SEPARATOR.'bootstrap'.DIRECTORY_SEPARATOR.'cache',
-            'check' => fn() => File::chmod('../bootstrap/cache') >= 755
+            'check' => [InstallHelper::class, 'checkBootstrapCache']
         ],
     ],
 

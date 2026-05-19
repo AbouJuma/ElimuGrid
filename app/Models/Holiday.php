@@ -6,8 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class Holiday extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = [
         'date',

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use JsonException;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class UserService {
@@ -292,9 +293,9 @@ class UserService {
             });
         } catch (\Throwable $th) {
             if (Str::contains($th->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                ResponseService::warningResponse("Message send successfully. But Email not sent.");
+                Log::warning("Message send successfully. But Email not sent.");
             } else {
-                ResponseService::errorResponse(trans('error_occured'));
+                throw $th;
             }
         }
 
@@ -311,18 +312,18 @@ class UserService {
         // Define the placeholders and their replacements
         $placeholders = [
             '{parent_name}' => $guardian->full_name,
-            '{code}' => Auth::user()->school->code,
+            '{code}' => Auth::user()->school->code ?? '',
             '{email}' => $guardian->email,
             '{password}' => $guardian->mobile,
-            '{school_name}' => $schoolSettings['school_name'],
+            '{school_name}' => $schoolSettings['school_name'] ?? Auth::user()->school->name ?? '',
 
             '{child_name}' => $child->full_name,
             '{grno}' => $child->email,
             '{child_password}' => $childPlainTextPassword,
             '{admission_no}' => $childAdmissionNumber,
 
-            '{support_email}' => $schoolSettings['school_email'] ?? '',
-            '{support_contact}' => $schoolSettings['school_phone'] ?? '',
+            '{support_email}' => $schoolSettings['school_email'] ?? Auth::user()->school->support_email ?? '',
+            '{support_contact}' => $schoolSettings['school_phone'] ?? Auth::user()->school->support_phone ?? '',
 
             '{android_app}' => $systemSettings['app_link'] ?? '',
             '{ios_app}' => $systemSettings['ios_app_link'] ?? '',
@@ -345,7 +346,7 @@ class UserService {
             $schoolSettings = $cache->getSchoolSettings();
             $email_body = $this->replaceStaffPlaceholders($user, $password, $schoolSettings);
             $data = [
-                'subject'     => 'Welcome to ' . $schoolSettings['school_name'],
+                'subject'     => 'Welcome to ' . ($schoolSettings['school_name'] ?? Auth::user()->school->name ?? ''),
                 'email'       => $user->email,
                 'email_body'  => $email_body
             ];
@@ -355,9 +356,9 @@ class UserService {
             });
         } catch (\Throwable $th) {
             if (Str::contains($th->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                ResponseService::warningResponse("Message send successfully. But Email not sent.");
+                Log::warning("Message send successfully. But Email not sent.");
             } else {
-                ResponseService::errorResponse(trans('error_occured'));
+                throw $th;
             }
         }
     }
@@ -372,13 +373,13 @@ class UserService {
         // Define the placeholders and their replacements
         $placeholders = [
             '{full_name}' => $user->full_name,
-            '{code}' => Auth::user()->school->code,
+            '{code}' => Auth::user()->school->code ?? '',
             '{email}' => $user->email,
             '{password}' => $password,
-            '{school_name}' => $schoolSettings['school_name'],
+            '{school_name}' => $schoolSettings['school_name'] ?? Auth::user()->school->name ?? '',
             
-            '{support_email}' => $schoolSettings['school_email'] ?? '',
-            '{support_contact}' => $schoolSettings['school_phone'] ?? '',
+            '{support_email}' => $schoolSettings['school_email'] ?? Auth::user()->school->support_email ?? '',
+            '{support_contact}' => $schoolSettings['school_phone'] ?? Auth::user()->school->support_phone ?? '',
 
             '{url}' => url('/'),
 
@@ -403,7 +404,7 @@ class UserService {
             $schoolSettings = $cache->getSchoolSettings();
             $email_body = $this->replaceApplicationRejectPlaceholders($user, $class_name, $schoolSettings, $guardian);
             $data = [
-                'subject'     => 'Admission Application Rejected - ' . $schoolSettings['school_name'],
+                'subject'     => 'Admission Application Rejected - ' . ($schoolSettings['school_name'] ?? Auth::user()->school->name ?? ''),
                 'email'       => $guardian->email,
                 'email_body'  => $email_body
             ];
@@ -413,9 +414,9 @@ class UserService {
             });
         } catch (\Throwable $th) {
             if (Str::contains($th->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                ResponseService::warningResponse("Message send successfully. But Email not sent.");
+                Log::warning("Message send successfully. But Email not sent.");
             } else {
-                ResponseService::errorResponse(trans('error_occured'));
+                throw $th;
             }
         }
     }
@@ -430,9 +431,9 @@ class UserService {
         $placeholders = [
             '{parent_name}' => $guardian->full_name,
             '{child_name}' => $user->full_name,
-            '{school_name}' => $schoolSettings['school_name'],
-            '{support_email}' => $schoolSettings['school_email'] ?? '',
-            '{support_contact}' => $schoolSettings['school_phone'] ?? '',
+            '{school_name}' => $schoolSettings['school_name'] ?? Auth::user()->school->name ?? '',
+            '{support_email}' => $schoolSettings['school_email'] ?? Auth::user()->school->support_email ?? '',
+            '{support_contact}' => $schoolSettings['school_phone'] ?? Auth::user()->school->support_phone ?? '',
             '{class}' => $class_name
             // Add more placeholders as needed
         ];

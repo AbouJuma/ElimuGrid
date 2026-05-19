@@ -36,6 +36,26 @@ class TransportStop extends Model
         return $query->where('school_id', Auth::user()->school_id);
     }
 
+    public function getPickupTimeAttribute()
+    {
+        return $this->attributes['morning_pickup_time'] ?? null;
+    }
+
+    public function setPickupTimeAttribute($value)
+    {
+        $this->attributes['morning_pickup_time'] = $value;
+    }
+
+    public function getDropTimeAttribute()
+    {
+        return $this->attributes['evening_drop_time'] ?? null;
+    }
+
+    public function setDropTimeAttribute($value)
+    {
+        $this->attributes['evening_drop_time'] = $value;
+    }
+
     public function route()
     {
         return $this->belongsTo(TransportRoute::class, 'route_id');

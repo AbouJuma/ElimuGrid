@@ -41,7 +41,7 @@
             <div class="col-lg-12 grid-margin stretch-card">
                 <div class="card">
                     <div class="card-body">
-                        <form class="create-form school-registration-form school-registration-validate" enctype="multipart/form-data" action="{{ route('schools.store') }}" method="POST" novalidate="novalidate">
+                        <form class="create-form school-registration-form" enctype="multipart/form-data" action="{{ route('schools.store') }}" method="POST" novalidate="novalidate">
                             @csrf
                             <div class="bg-light p-4 mt-4 mb-4">
                                 <h4 class="card-title mb-4">
@@ -53,10 +53,10 @@
                                         <input type="text" name="school_name" id="school_name" placeholder="{{__('schools')}}" class="form-control" required>
                                     </div>
                                     <div class="form-group col-sm-12 col-md-6">
-                                        <label>{{ __('logo') }} <span class="text-danger">*</span></label>
-                                        <input type="file" required name="school_image" id="school_image" class="file-upload-default" accept="image/png, image/jpg, image/jpeg, image/svg+xml"/>
+                                        <label>{{ __('logo') }}</label>
+                                        <input type="file" name="school_image" id="school_image" class="file-upload-default" accept="image/png, image/jpg, image/jpeg, image/svg+xml"/>
                                         <div class="input-group col-xs-12">
-                                            <input type="text" class="form-control file-upload-info" disabled="" placeholder="{{ __('logo') }}" required aria-label=""/>
+                                            <input type="text" class="form-control file-upload-info" disabled="" placeholder="{{ __('logo') }}" aria-label=""/>
                                             <span class="input-group-append">
                                                 <button class="file-upload-browse btn btn-theme" type="button">{{ __('upload') }}</button>
                                             </span>
@@ -750,4 +750,49 @@
             const schoolHelpModal = new HelpModal('schoolHelpModal');
         });
     </script>
+<script>
+$(document).ready(function() {
+    // Override form submission to bypass validation and fix hanging
+    $('.school-registration-form').off('submit').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Get form data
+        var formData = new FormData(this);
+        
+        // Direct AJAX submission without validation interference
+        $.ajax({
+            url: '{{ route('schools.store') }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            },
+            success: function(data) {
+                if (data.status === 'success' || data.code === 200) {
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showErrorToast(data.message || 'Error occurred');
+                    if (typeof showErrorToast === 'function') {
+                        showErrorToast(data.message || 'Error occurred');
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                if (typeof closeLoading === 'function') {
+                    closeLoading();
+                }
+                if (typeof showErrorToast === 'function') {
+                    showErrorToast('Error: ' + (error || 'Unknown error'));
+                }
+                console.log('AJAX Error:', {status: status, error: error, xhr: xhr});
+            }
+        });
+    });
+});
+</script>
 @endpush

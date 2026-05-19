@@ -5,12 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\ContactInquiry;
 use App\Models\School;
 use App\Services\ResponseService;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Database\Eloquent\Builder;
 use App\Repositories\ContactInquiry\ContactInquiryInterface;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use App\Services\BootstrapTableService;
 
@@ -114,9 +114,7 @@ class ContactInquiryController extends Controller
             $school = Auth::user()->school;
             if ($school) {
                 $school = School::find($school->id);
-                Config::set('database.connections.school.database', $school->database_name);
-                DB::purge('school');
-                DB::connection('school')->reconnect();
+                SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
                 DB::setDefaultConnection('school');
             }
         } else {

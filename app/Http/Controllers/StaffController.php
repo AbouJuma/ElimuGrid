@@ -120,7 +120,7 @@ class StaffController extends Controller {
             if ($validator->fails()) {
                 ResponseService::validationError($validator->errors()->first());
             }
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
 
             // Check free trial package
             if (Auth::user()->school_id) {
@@ -286,7 +286,7 @@ class StaffController extends Controller {
                 $this->sessionYearsTrackingsService->storeSessionYearsTracking('App\Models\Staff', $staff->id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
 
             if ($user->school_id) {
                 $sendEmail = app(UserService::class);
@@ -297,10 +297,10 @@ class StaffController extends Controller {
 
         } catch (Throwable $e) {
             if (Str::contains($e->getMessage(), ['Failed', 'Mail', 'Mailer', 'MailManager'])) {
-                DB::commit();
+                DB::connection('mysql')->commit();
                 ResponseService::warningResponse("Staff Registered successfully. But Email not sent.");
             } else {
-                DB::rollback();
+                DB::connection('mysql')->rollBack();
                 ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
             }
@@ -431,7 +431,7 @@ class StaffController extends Controller {
             if ($validator->fails()) {
                 ResponseService::validationError($validator->errors()->first());
             }
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $data = $request->except('school_id');
             if ($request->hasFile('image')) {
                 $data['image'] = $request->file('image');
@@ -513,7 +513,7 @@ class StaffController extends Controller {
                 $this->staffSupportSchool->upsert($data, ['user_id', 'school_id'], ['user_id', 'school_id']);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -525,17 +525,17 @@ class StaffController extends Controller {
         ResponseService::noFeatureThenRedirect('Staff Management');
         ResponseService::noPermissionThenSendJson('staff-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $user = $this->user->findById($id);
             $this->user->builder()->where('id', $id)->withTrashed()->update(['status' => $user->status == 0 ? 1 : 0, 'deleted_at' => $user->status == 1 ? now() : null]);
             if(Auth::user() && Auth::user()->school_id) {
                 $sessionYear = $this->cache->getDefaultSessionYear();
                 $this->sessionYearsTrackingsService->deleteSessionYearsTracking('App\Models\Staff', $id, Auth::user()->id, $sessionYear->id, Auth::user()->school_id, null);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Deleted Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }
@@ -545,7 +545,7 @@ class StaffController extends Controller {
         ResponseService::noFeatureThenRedirect('Staff Management');
         ResponseService::noPermissionThenSendJson('staff-delete');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $staff = $this->user->findTrashedById($id);
 
             if ($staff->status == 0) {
@@ -561,7 +561,7 @@ class StaffController extends Controller {
             }
 
             $this->user->builder()->where('id', $id)->withTrashed()->update(['status' => $staff->status == 0 ? 1 : 0, 'deleted_at' => $staff->status == 1 ? now() : null]);
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -589,7 +589,24 @@ class StaffController extends Controller {
         $support_staffs = $this->staffSupportSchool->builder()->Owner()->with('user:id,first_name,last_name,mobile,email,image')->get();
         $super_admin = '';
         if (!count($support_staffs)) {
-            $super_admin = $this->user->builder()->select('first_name', 'last_name', 'mobile', 'email', 'image')->orWhereNull('school_id')->role('Super Admin')->first();
+            // Temporarily clear current school ID to query central users table
+            $originalSchoolId = config('tenant.current_school_id');
+            config(['tenant.current_school_id' => null]);
+            
+            try {
+                $super_admin = \App\Models\User::whereNull('school_id')
+                    ->whereExists(function ($query) {
+                        $query->select(DB::raw(1))
+                            ->from('model_has_roles')
+                            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+                            ->whereColumn('model_has_roles.model_id', 'users.id')
+                            ->where('roles.name', 'Super Admin');
+                    })
+                    ->first();
+            } finally {
+                // Restore original school ID
+                config(['tenant.current_school_id' => $originalSchoolId]);
+            }
         }
         $settings = [
             'mobile' => app(CachingService::class)->getSystemSettings()['mobile'] ?? '',
@@ -603,7 +620,7 @@ class StaffController extends Controller {
         ResponseService::noFeatureThenRedirect('Staff Management');
         ResponseService::noPermissionThenRedirect('staff-create');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $userIds = json_decode($request->ids);
             foreach ($userIds as $userId) {
                 $staff = $this->user->findTrashedById($userId);
@@ -622,7 +639,7 @@ class StaffController extends Controller {
 
                 $this->user->builder()->where('id', $userId)->withTrashed()->update(['status' => $staff->status == 0 ? 1 : 0, 'deleted_at' => $staff->status == 1 ? now() : null]);
             }
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Status Updated Successfully");
         } catch (Throwable $e) {
             ResponseService::logErrorResponse($e);
@@ -896,7 +913,7 @@ class StaffController extends Controller {
     {
         ResponseService::noFeatureThenRedirect('Expense Management');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             // Store allowances
             $allowance_data = array();
             $allowance_status = 0;
@@ -935,10 +952,10 @@ class StaffController extends Controller {
                 $this->staffSalary->upsert($deduction_data,['staff_id','payroll_setting_id'],['amount','percentage']);
             }
 
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse("Data Updated Successfully");
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e);
             ResponseService::errorResponse();
         }

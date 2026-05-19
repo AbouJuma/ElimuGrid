@@ -1,4 +1,13 @@
 @extends('layouts.master')
+@php
+    $authUser = Auth::user();
+    $customSchoolContext = session('auth_logged_in') && session('auth_school_id');
+    $showSchoolDashboard = $customSchoolContext
+        || ($authUser && ($authUser->hasRole('School Admin') || $authUser->school_id));
+    $isSchoolAdminView = $customSchoolContext
+        || ($authUser && $authUser->hasRole('School Admin'));
+    $showSuperAdminDashboard = $authUser && ($authUser->hasRole('Super Admin') || ! $authUser->school_id);
+@endphp
 @section('title')
     {{ __('dashboard') }}
 @endsection
@@ -22,10 +31,10 @@
             </h3>
         </div>
         {{-- School Dashboard --}}
-        @if (Auth::user()->hasRole('School Admin') || Auth::user()->school_id)
+        @if ($showSchoolDashboard)
             <div class="row">
                 {{-- License expire message --}}
-                @if (Auth::user()->hasRole('School Admin'))
+                @if ($isSchoolAdminView)
                     @if ($license_expire <= ($settings['current_plan_expiry_warning_days'] ?? 7) && $subscription)
                         <div class="col-sm-12 col-md-12">
                             <div class="alert alert-danger" role="alert">
@@ -102,7 +111,7 @@
             </div>
         @endif
     </div>
-    @if (Auth::user()->hasRole('School Admin'))
+    @if ($isSchoolAdminView)
         <div class="row">
             {{-- Teachers --}}
             <div class="col-md-2-4 stretch-card grid-margin">
@@ -196,7 +205,7 @@
     <div class="row">
 
         {{-- Expense Graph --}}
-        @if (Auth::user()->canany(['expense-create', 'expense-list']))
+        @if (($authUser && $authUser->canany(['expense-create', 'expense-list'])) || $customSchoolContext)
             <div class="col-md-8 grid-margin stretch-card">
                 <div class="card">
                     <div class="card-body custom-card-body">
@@ -535,7 +544,7 @@
 {{-- End School Dashboard --}}
 
 {{-- Super Admin Dashboard --}}
-@if (Auth::user()->hasRole('Super Admin') || !Auth::user()->school_id)
+@if ($showSuperAdminDashboard)
     <div class="row">
 
         <div class="col-md-3 stretch-card grid-margin">
@@ -731,7 +740,7 @@
 @endsection
 @section('script')
 
-@if (Auth::user()->school_id)
+@if (($authUser && $authUser->school_id) || $customSchoolContext)
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
 @endif
@@ -739,7 +748,7 @@
 
 
 
-@if (!Auth::user()->school_id)
+@if ($showSuperAdminDashboard)
 <script>
     window.onload = setTimeout(() => {
         $('.year-filter').trigger('change');

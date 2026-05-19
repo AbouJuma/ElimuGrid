@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class SessionYear extends Model {
-    use SoftDeletes;
-    use HasFactory;
+    use SoftDeletes, HasFactory, TenantModel;
 
     protected $fillable = [
         'name',

@@ -6,9 +6,11 @@ use Auth;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\TenantModel;
+
 class Faq extends Model
 {
-    use HasFactory;
+    use HasFactory, TenantModel;
     protected $fillable = ['title','description', 'school_id'];
 
     public function scopeOwner()

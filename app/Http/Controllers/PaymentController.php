@@ -8,8 +8,8 @@ use App\Models\PaymentConfiguration;
 use Illuminate\Support\Facades\Auth;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Config;
 use App\Models\School;
+use App\Services\SharedHostingTenantService;
 use Illuminate\Support\Facades\Http;
 class PaymentController extends Controller
 {
@@ -33,10 +33,8 @@ class PaymentController extends Controller
             return response()->json(['error' => 'School not found'], 404);
         }
 
-        // Set up school database connection
-        Config::set('database.connections.school.database', $school->database_name);
-        DB::purge('school');
-        DB::connection('school')->reconnect();
+        // Set up school database connection (shared DB + prefix or legacy schema)
+        SharedHostingTenantService::configureSchoolConnectionFromDatabaseName($school->database_name);
         DB::setDefaultConnection('school');
 
         // Get payment gateway configuration from school database

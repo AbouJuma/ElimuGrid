@@ -6,8 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
+use App\Traits\TenantModel;
+
 class AnnouncementClass extends Model {
-    use HasFactory;
+    use HasFactory, TenantModel;
 
     protected $fillable = ['announcement_id', 'class_section_id', 'school_id', 'class_subject_id'];
     protected $hidden = ['created_at','updated_at'];

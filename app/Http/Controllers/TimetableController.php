@@ -412,7 +412,7 @@ class TimetableController extends Controller {
         ResponseService::noFeatureThenRedirect('Timetable Management');
         ResponseService::noPermissionThenRedirect('timetable-list');
         try {
-            DB::beginTransaction();
+            DB::connection('mysql')->beginTransaction();
             $settings = array(
                 'timetable_start_time', 'timetable_end_time', 'timetable_duration'
             );
@@ -437,10 +437,10 @@ class TimetableController extends Controller {
             }
             $this->schoolSettings->upsert($data, ["name"], ["data", "type"]);
             $this->cache->removeSchoolCache(config('constants.CACHE.SCHOOL.SETTINGS'));
-            DB::commit();
+            DB::connection('mysql')->commit();
             ResponseService::successResponse('Data Updated Successfully');
         } catch (Throwable $e) {
-            DB::rollBack();
+            DB::connection('mysql')->rollBack();
             ResponseService::logErrorResponse($e, "Timetable Controller -> updateTimetableSettings");
             ResponseService::errorResponse();
         }

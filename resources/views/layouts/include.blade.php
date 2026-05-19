@@ -27,7 +27,6 @@
 <link rel="stylesheet" href="{{ asset('/assets/css/ekko-lightbox.css') }}">
 <link rel="stylesheet" href="{{ asset('/assets/css/jquery.tagsinput.min.css') }}">
 
-{{--<link rel="stylesheet" href="{{ asset('/assets/bootstrap-table/bootstrap-table.min.css') }}">--}}
 <link rel="stylesheet" href="https://unpkg.com/bootstrap-table@1.22.1/dist/bootstrap-table.min.css">
 <link rel="stylesheet" href="{{ asset('/assets/bootstrap-table/fixed-columns.min.css') }}">
 <link rel="stylesheet" href="{{ asset('/assets/bootstrap-table/reorder-rows.css') }}">
