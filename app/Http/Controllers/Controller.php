@@ -152,7 +152,7 @@ class Controller extends BaseController {
             
         }
 
-        if ($this->isSchoolWebsiteRequest()) {
+        if ($this->isSchoolWebsiteRequest() || !$school) {
         	$features = Feature::activeFeatures()->get();
 
         	$settings = app(CachingService::class)->getSystemSettings();
