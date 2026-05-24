@@ -123,6 +123,8 @@ class SharedHostingTenantService
                 return;
             }
 
+            Config::set('tenant.current_school_id', $schoolId);
+
             foreach (['driver', 'url', 'host', 'port', 'database', 'username', 'password', 'unix_socket', 'charset', 'collation', 'strict', 'engine'] as $key) {
                 if (array_key_exists($key, $mysql)) {
                     Config::set("database.connections.school.{$key}", $mysql[$key]);
@@ -141,6 +143,7 @@ class SharedHostingTenantService
             return;
         }
 
+        Config::set('tenant.current_school_id', null);
         Config::set('database.connections.school.prefix', '');
         Config::set('database.connections.school.prefix_indexes', true);
         Config::set('database.connections.school.database', $databaseName);
@@ -155,6 +158,7 @@ class SharedHostingTenantService
     public static function resetSchoolDatabaseConnection(): void
     {
         $centralDb = config('database.connections.mysql.database');
+        Config::set('tenant.current_school_id', null);
         Config::set('database.connections.school.prefix', '');
         Config::set('database.connections.school.prefix_indexes', true);
         Config::set('database.connections.school.database', $centralDb);
